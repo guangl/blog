@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="utf-8" />
+  <meta name="generator" content="Hugo 0.151.2">
+
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="author" content="" />
+  <meta property="og:url" content="http://localhost:1313/posts/batch-param-opt/" />
+  <link rel="canonical" href="http://localhost:1313/posts/batch-param-opt/" /><link
+    rel="alternate"
+    type="application/atom+xml"
+    href="http://localhost:1313/index.xml"
+    title="guangluo&#39;s blog"
+  />
+
+  <script type="application/ld+json">
+  {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+           "@type": "WebPage",
+           "@id": "http:\/\/localhost:1313\/"
+      },
+      "articleSection" : "posts",
+      "name" : "BATCH_PARAM_OPT",
+      "headline" : "BATCH_PARAM_OPT",
+      "description" : "是否启用 DML 的参数优化。\n参数解析 属性：静态级（需要重启才能生效） 缺省值：0\nBATCH_PARAM_OPT 取不同值的效果如下：\n0：不开启参数优化； 1：模式 1，大幅度优化，但是限制较大（参数表优化）； 2：模式 2，小幅度优化，但是没有限制（操作符优化）； 3：尽量使用模式 1，如果无法触发模式 1 的优化，那就使用模式 2 的优化； 支持 BLOB 等大字段的优化。\n原理解析 [!WARNING] 为啥默认值不是 2 呢，操作符优化不配吗？\nBATCH_PARAM_OPT=1 （参数表优化） 至于为什么构造参数表会加快批量操作，可能是因为，对表的 join 操作会比一条 SQL 执行多次，造成多次开销更快一些。\n[!NOTE] 如果需要优化，则需要满足以下条件：\n单条 DML 语句； 都是输入参数，没有常量参数、输出参数、复合类型的参数； 表上没有 ERR_LOG 错误日志； 没有设置批量容错 DSQL_ATTR_IGN_BP_ERR； 有一些疑问，疑问如下：\n如果参数表够大触发了刷盘，会使用 TEMP 表空间吗？ 答案是会返回 EC_SRC_MULTI_ROWS 错误，让客户端使用非批量的方式重试。 INSERT 优化原理 查看以下的执行计划：\ninsert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BATCH_PARAM_OPT = 1 时候的计划 INSERT 参数中的 type 取值，会改变成 select 他会将 SQL 转换为\n",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "2025",
+      "datePublished": "2025-10-23 17:12:01 \u002b0800 CST",
+      "dateModified" : "2025-10-23 17:12:01 \u002b0800 CST",
+      "url" : "http:\/\/localhost:1313\/posts\/batch-param-opt\/",
+      "keywords" : [  ]
+  }
+</script>
+<title>BATCH_PARAM_OPT</title>
+  <meta property="og:title" content="BATCH_PARAM_OPT" />
+  <meta property="og:type" content="article" />
+  <meta
+    property="og:description"
+    content="是否启用 DML 的参数优化。
+参数解析 属性：静态级（需要重启才能生效） 缺省值：0
+BATCH_PARAM_OPT 取不同值的效果如下：
+0：不开启参数优化； 1：模式 1，大幅度优化，但是限制较大（参数表优化）； 2：模式 2，小幅度优化，但是没有限制（操作符优化）； 3：尽量使用模式 1，如果无法触发模式 1 的优化，那就使用模式 2 的优化； 支持 BLOB 等大字段的优化。
+原理解析 [!WARNING] 为啥默认值不是 2 呢，操作符优化不配吗？
+BATCH_PARAM_OPT=1 （参数表优化） 至于为什么构造参数表会加快批量操作，可能是因为，对表的 join 操作会比一条 SQL 执行多次，造成多次开销更快一些。
+[!NOTE] 如果需要优化，则需要满足以下条件：
+单条 DML 语句； 都是输入参数，没有常量参数、输出参数、复合类型的参数； 表上没有 ERR_LOG 错误日志； 没有设置批量容错 DSQL_ATTR_IGN_BP_ERR； 有一些疑问，疑问如下：
+如果参数表够大触发了刷盘，会使用 TEMP 表空间吗？ 答案是会返回 EC_SRC_MULTI_ROWS 错误，让客户端使用非批量的方式重试。 INSERT 优化原理 查看以下的执行计划：
+insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BATCH_PARAM_OPT = 1 时候的计划 INSERT 参数中的 type 取值，会改变成 select 他会将 SQL 转换为
+"
+  />
+  <meta
+    name="description"
+    content="是否启用 DML 的参数优化。
+参数解析 属性：静态级（需要重启才能生效） 缺省值：0
+BATCH_PARAM_OPT 取不同值的效果如下：
+0：不开启参数优化； 1：模式 1，大幅度优化，但是限制较大（参数表优化）； 2：模式 2，小幅度优化，但是没有限制（操作符优化）； 3：尽量使用模式 1，如果无法触发模式 1 的优化，那就使用模式 2 的优化； 支持 BLOB 等大字段的优化。
+原理解析 [!WARNING] 为啥默认值不是 2 呢，操作符优化不配吗？
+BATCH_PARAM_OPT=1 （参数表优化） 至于为什么构造参数表会加快批量操作，可能是因为，对表的 join 操作会比一条 SQL 执行多次，造成多次开销更快一些。
+[!NOTE] 如果需要优化，则需要满足以下条件：
+单条 DML 语句； 都是输入参数，没有常量参数、输出参数、复合类型的参数； 表上没有 ERR_LOG 错误日志； 没有设置批量容错 DSQL_ATTR_IGN_BP_ERR； 有一些疑问，疑问如下：
+如果参数表够大触发了刷盘，会使用 TEMP 表空间吗？ 答案是会返回 EC_SRC_MULTI_ROWS 错误，让客户端使用非批量的方式重试。 INSERT 优化原理 查看以下的执行计划：
+insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BATCH_PARAM_OPT = 1 时候的计划 INSERT 参数中的 type 取值，会改变成 select 他会将 SQL 转换为
+"
+  />
+  <meta property="og:locale" content="en-us" /><meta property="og:image" content="" />
+  
+  
+  <style>body{font-family:bree serif,sans-serif;-webkit-font-smoothing:antialiased;margin:0 20px}article{max-width:800px;margin-left:auto;margin-right:auto}a{color:#000;text-decoration:none}a:hover{font-weight:600;text-decoration:underline}.post-ads{margin:50px 0}.markdown-body{font-size:18px;max-width:100%}.markdown-body a{text-decoration:underline;text-decoration-color:#000}.markdown-body blockquote{margin:0;padding:0 1em;color:#57606a;border-left:.25em solid #d0d7de}.markdown-body pre{padding:16px;overflow:auto;border-radius:10px}.markdown-body code{padding:.2em .4em;font-size:85%;background-color:#f6f8fa;border-radius:6px}.markdown-body pre>code{padding:0;font-size:100%;background-color:inherit;border:0}.Chinese .markdown-body{line-height:200%}.site-date-catalog{font-size:2rem}.header-title{font-size:2rem;font-weight:700;margin-top:32px;font-family:bungee shade,sans-serif}.header-title a{text-decoration:none}.header-subtitle{color:#666}.header-items{margin:10px 0}.header-item{margin:0 5px}.header-line{width:100%;border-width:2px;border-color:#482936;border-style:solid none none none}.lang-switch{font-weight:600}#posts-list{min-height:600px}.posts-line{font-size:1.2rem;margin:12px 0}.posts-categories{font-size:.8rem;margin:auto;text-align:center}.posts-category{padding:3px 0;border:#000 2px solid;border-radius:5px}.site-footer{margin-top:50px}.site-footer-item{margin-right:12px}.post-header{margin-bottom:50px}.post-title{font-size:2rem;font-weight:600}.post-tags{display:inline;font-weight:600;padding:2px 5px;margin-right:6px;border:#000 2px solid;border-radius:5px}.post-date{font-weight:800;font-style:italic}.post-author{float:right;font-weight:600}.page-content{min-height:60%}.post-content{margin-bottom:50px}.post-content p{hyphens:auto;line-height:1.8;text-justify:ideographic;margin-bottom:1em}.post-content img{max-width:100%;display:block;margin-right:auto;margin-top:6px}.post-content .post-gallery{display:flex;flex-wrap:wrap;gap:6px}.post-content .post-gallery img{margin-right:auto;margin-top:auto;width:calc(50% - 3px)}.related-content{border-width:3px;border-style:solid;border-color:#000;padding:0 10px;margin-bottom:50px;margin-top:100px}.related-content li{margin:5px 0}.taxonomy-term{font-size:3rem}.gallery-img{text-align:center}.gallery-img span{text-align:center}.gallery-img-desc{font-size:.8em;font-weight:800}#disqus_thread{position:relative}#disqus_thread:after{content:"";display:block;height:55px;width:100%;position:absolute;bottom:0;background:#fff}@media screen and (max-width:600px){.header-title,.header-subtitle,.header-items{}.posts-line{font-size:16px}.markdown-body{font-size:16px}.post-title{font-size:2rem}.post-content p{letter-spacing:.05em}.post-content .post-gallery img{width:100%}}@media screen and (max-width:48em){.posts-category{display:none}}</style>
+  
+  
+  <style>.container,.container-fluid{margin-right:auto;margin-left:auto}.container-fluid{padding-right:2rem;padding-left:2rem}.row{box-sizing:border-box;display:-webkit-box;display:-ms-flexbox;display:flex;-webkit-box-flex:0;-ms-flex:0 1 auto;flex:initial;-webkit-box-orient:horizontal;-webkit-box-direction:normal;-ms-flex-direction:row;flex-direction:row;-ms-flex-wrap:wrap;flex-wrap:wrap;margin-right:-.5rem;margin-left:-.5rem}.row.reverse{-webkit-box-orient:horizontal;-webkit-box-direction:reverse;-ms-flex-direction:row-reverse;flex-direction:row-reverse}.col.reverse{-webkit-box-orient:vertical;-webkit-box-direction:reverse;-ms-flex-direction:column-reverse;flex-direction:column-reverse}.col-xs,.col-xs-1,.col-xs-10,.col-xs-11,.col-xs-12,.col-xs-2,.col-xs-3,.col-xs-4,.col-xs-5,.col-xs-6,.col-xs-7,.col-xs-8,.col-xs-9,.col-xs-offset-0,.col-xs-offset-1,.col-xs-offset-10,.col-xs-offset-11,.col-xs-offset-12,.col-xs-offset-2,.col-xs-offset-3,.col-xs-offset-4,.col-xs-offset-5,.col-xs-offset-6,.col-xs-offset-7,.col-xs-offset-8,.col-xs-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-xs{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-xs-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-xs-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-xs-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-xs-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-xs-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-xs-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-xs-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-xs-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-xs-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-xs-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-xs-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-xs-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-xs-offset-0{margin-left:0}.col-xs-offset-1{margin-left:8.33333333%}.col-xs-offset-2{margin-left:16.66666667%}.col-xs-offset-3{margin-left:25%}.col-xs-offset-4{margin-left:33.33333333%}.col-xs-offset-5{margin-left:41.66666667%}.col-xs-offset-6{margin-left:50%}.col-xs-offset-7{margin-left:58.33333333%}.col-xs-offset-8{margin-left:66.66666667%}.col-xs-offset-9{margin-left:75%}.col-xs-offset-10{margin-left:83.33333333%}.col-xs-offset-11{margin-left:91.66666667%}.start-xs{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-xs{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-xs{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-xs{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-xs{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-xs{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-xs{-ms-flex-pack:distribute;justify-content:space-around}.between-xs{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-xs{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-xs{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}@media only screen and (min-width:48em){.container{width:49rem}.col-sm,.col-sm-1,.col-sm-10,.col-sm-11,.col-sm-12,.col-sm-2,.col-sm-3,.col-sm-4,.col-sm-5,.col-sm-6,.col-sm-7,.col-sm-8,.col-sm-9,.col-sm-offset-0,.col-sm-offset-1,.col-sm-offset-10,.col-sm-offset-11,.col-sm-offset-12,.col-sm-offset-2,.col-sm-offset-3,.col-sm-offset-4,.col-sm-offset-5,.col-sm-offset-6,.col-sm-offset-7,.col-sm-offset-8,.col-sm-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-sm{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-sm-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-sm-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-sm-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-sm-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-sm-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-sm-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-sm-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-sm-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-sm-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-sm-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-sm-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-sm-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-sm-offset-0{margin-left:0}.col-sm-offset-1{margin-left:8.33333333%}.col-sm-offset-2{margin-left:16.66666667%}.col-sm-offset-3{margin-left:25%}.col-sm-offset-4{margin-left:33.33333333%}.col-sm-offset-5{margin-left:41.66666667%}.col-sm-offset-6{margin-left:50%}.col-sm-offset-7{margin-left:58.33333333%}.col-sm-offset-8{margin-left:66.66666667%}.col-sm-offset-9{margin-left:75%}.col-sm-offset-10{margin-left:83.33333333%}.col-sm-offset-11{margin-left:91.66666667%}.start-sm{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-sm{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-sm{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-sm{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-sm{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-sm{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-sm{-ms-flex-pack:distribute;justify-content:space-around}.between-sm{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-sm{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-sm{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}}@media only screen and (min-width:64em){.container{width:65rem}.col-md,.col-md-1,.col-md-10,.col-md-11,.col-md-12,.col-md-2,.col-md-3,.col-md-4,.col-md-5,.col-md-6,.col-md-7,.col-md-8,.col-md-9,.col-md-offset-0,.col-md-offset-1,.col-md-offset-10,.col-md-offset-11,.col-md-offset-12,.col-md-offset-2,.col-md-offset-3,.col-md-offset-4,.col-md-offset-5,.col-md-offset-6,.col-md-offset-7,.col-md-offset-8,.col-md-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-md{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-md-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-md-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-md-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-md-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-md-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-md-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-md-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-md-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-md-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-md-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-md-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-md-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-md-offset-0{margin-left:0}.col-md-offset-1{margin-left:8.33333333%}.col-md-offset-2{margin-left:16.66666667%}.col-md-offset-3{margin-left:25%}.col-md-offset-4{margin-left:33.33333333%}.col-md-offset-5{margin-left:41.66666667%}.col-md-offset-6{margin-left:50%}.col-md-offset-7{margin-left:58.33333333%}.col-md-offset-8{margin-left:66.66666667%}.col-md-offset-9{margin-left:75%}.col-md-offset-10{margin-left:83.33333333%}.col-md-offset-11{margin-left:91.66666667%}.start-md{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-md{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-md{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-md{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-md{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-md{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-md{-ms-flex-pack:distribute;justify-content:space-around}.between-md{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-md{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-md{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}}@media only screen and (min-width:75em){.container{width:76rem}.col-lg,.col-lg-1,.col-lg-10,.col-lg-11,.col-lg-12,.col-lg-2,.col-lg-3,.col-lg-4,.col-lg-5,.col-lg-6,.col-lg-7,.col-lg-8,.col-lg-9,.col-lg-offset-0,.col-lg-offset-1,.col-lg-offset-10,.col-lg-offset-11,.col-lg-offset-12,.col-lg-offset-2,.col-lg-offset-3,.col-lg-offset-4,.col-lg-offset-5,.col-lg-offset-6,.col-lg-offset-7,.col-lg-offset-8,.col-lg-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-lg{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-lg-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-lg-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-lg-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-lg-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-lg-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-lg-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-lg-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-lg-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-lg-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-lg-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-lg-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-lg-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-lg-offset-0{margin-left:0}.col-lg-offset-1{margin-left:8.33333333%}.col-lg-offset-2{margin-left:16.66666667%}.col-lg-offset-3{margin-left:25%}.col-lg-offset-4{margin-left:33.33333333%}.col-lg-offset-5{margin-left:41.66666667%}.col-lg-offset-6{margin-left:50%}.col-lg-offset-7{margin-left:58.33333333%}.col-lg-offset-8{margin-left:66.66666667%}.col-lg-offset-9{margin-left:75%}.col-lg-offset-10{margin-left:83.33333333%}.col-lg-offset-11{margin-left:91.66666667%}.start-lg{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-lg{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-lg{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-lg{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-lg{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-lg{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-lg{-ms-flex-pack:distribute;justify-content:space-around}.between-lg{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-lg{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-lg{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}}</style>
+  
+   <link href="/index.xml" rel="alternate" type="application/rss+xml" title="guangluo&#39;s blog">
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com" />
+  <link
+    href="https://fonts.googleapis.com/css?family=Bree+Serif|Bungee+Shade"
+    rel="stylesheet"
+  />
+  
+  
+
+  
+  
+</head>
+
+
+<body>
+  <article class="post " id="article">
+    <div class="row">
+      <div class="col-xs-12">
+        <div class="site-header">
+          
+<header>
+  <div class="header-title">
+    <a href="/"
+      >Guang Luo</a
+    >
+  </div>
+  <div class="header-subtitle"></div>
+</header>
+<div class="row end-md header-items">
+  
+  <div class="header-item">
+    <a href="https://github.com/guangluo" target="_blank">Github</a>
+  </div>
+  
+</div>
+<div class="row">
+   
+</div>
+<div class="header-line"></div>
+
+        </div>
+        <header class="post-header">
+          <h1 class="post-title">BATCH_PARAM_OPT</h1>
+          
+          <div class="row post-desc">
+            <div class="col-xs-6">
+              
+              <time class="post-date" datetime="2025-10-23 17:12:01 CST">
+                23 Oct 2025
+              </time>
+              
+            </div>
+            <div class="col-xs-6">
+              
+            </div>
+          </div>
+          
+        </header>
+
+        <div class="post-content markdown-body">
+          
+          <p>是否启用 DML 的参数优化。</p>
+<h2 id="参数解析">参数解析</h2>
+<p><strong>属性</strong>：静态级（需要重启才能生效）
+<strong>缺省值</strong>：0</p>
+<p><code>BATCH_PARAM_OPT</code> 取不同值的效果如下：</p>
+<ul>
+<li>0：不开启参数优化；</li>
+<li>1：模式 1，大幅度优化，但是限制较大（参数表优化）；</li>
+<li>2：模式 2，小幅度优化，但是没有限制（操作符优化）；</li>
+<li>3：尽量使用模式 1，如果无法触发模式 1 的优化，那就使用模式 2 的优化；</li>
+</ul>
+<p>支持 BLOB 等大字段的优化。</p>
+<h2 id="原理解析">原理解析</h2>
+<blockquote>
+<p>[!WARNING]
+为啥默认值不是 2 呢，操作符优化不配吗？</p>
+</blockquote>
+<h3 id="batch_param_opt1-参数表优化"><code>BATCH_PARAM_OPT=1</code> （参数表优化）</h3>
+<p>至于为什么构造参数表会加快批量操作，可能是因为，对表的 join 操作会比一条 SQL 执行多次，造成多次开销更快一些。</p>
+<blockquote>
+<p>[!NOTE]
+如果需要优化，则需要满足以下条件：</p>
+<ol>
+<li>单条 DML 语句；</li>
+<li>都是输入参数，没有常量参数、输出参数、复合类型的参数；</li>
+<li>表上没有 <code>ERR_LOG</code> 错误日志；</li>
+<li>没有设置批量容错 <code>DSQL_ATTR_IGN_BP_ERR</code>；</li>
+</ol>
+</blockquote>
+<p>有一些疑问，疑问如下：</p>
+<ol>
+<li>如果参数表够大触发了刷盘，会使用 <code>TEMP</code> 表空间吗？
+<img src="/database/batch-param-opt-01.jpg" alt="alt text">
+答案是<strong>会返回 <code>EC_SRC_MULTI_ROWS</code> 错误</strong>，让客户端使用非批量的方式重试。</li>
+</ol>
+<h4 id="insert-优化原理"><code>INSERT</code> 优化原理</h4>
+<p>查看以下的执行计划：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">insert</span> <span style="font-weight:bold">into</span> users <span style="font-weight:bold">values</span> ( ?, ?, ?, ? );
+</span></span></code></pre></div><ul>
+<li><code>BATCH_PARAM_OPT = 0</code> 时候的计划
+<img src="/database/batch-param-opt-02.png" alt="alt text"></li>
+<li><code>BATCH_PARAM_OPT = 1</code> 时候的计划
+<img src="/database/batch-param-opt-03.png" alt="alt text">
+<code>INSERT</code> 参数中的 <code>type</code> 取值，会改变成 <code>select</code></li>
+</ul>
+<p>他会将 SQL 转换为</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">insert</span> <span style="font-weight:bold">into</span> users <span style="font-weight:bold">values</span> (<span style="font-style:italic">&#34;PARAM#0000#COL0&#34;</span>, <span style="font-style:italic">&#34;PARAM#0000#COL1&#34;</span>, <span style="font-style:italic">&#34;PARAM#0000#COL2&#34;</span>, <span style="font-style:italic">&#34;PARAM#0000#COL3&#34;</span>);
+</span></span></code></pre></div><p>会先构成一个参数表，表结构如下所示</p>
+<table>
+  <thead>
+      <tr>
+          <th><code>PARA#0000#COL0</code></th>
+          <th><code>PARAM#0000#COL1</code></th>
+          <th><code>PARAM#0000#COL2</code></th>
+          <th><code>PARAM#0000#COL3</code></th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>COL01</td>
+          <td>COL11</td>
+          <td>COL21</td>
+          <td>COL31</td>
+      </tr>
+      <tr>
+          <td>COL02</td>
+          <td>COL12</td>
+          <td>COL22</td>
+          <td>COL32</td>
+      </tr>
+      <tr>
+          <td>通过查询参数表来进行插入，从执行计划可知，<code>PSCN</code> 存在 1000000 行，其实是可以得知需要插入的行数的，参数表是存在表级统计信息的。</td>
+          <td></td>
+          <td></td>
+          <td></td>
+      </tr>
+  </tbody>
+</table>
+<h4 id="update-优化原理"><code>UPDATE</code> 优化原理</h4>
+<blockquote>
+<p>[!NOTE]
+如果需要优化更新需要满足以下条件</p>
+<ol>
+<li>更新列不能是大字段列；</li>
+<li>只能是查询更新，不能是游标更新（将查询结果存入游标中）；</li>
+<li>查询条件不包含 <code>rownum</code>；</li>
+<li>没有触发大表更新 <code>bupd</code>（由 <code>ENABLE_FAST_UPDATE</code> 控制，默认不开启）；</li>
+<li>所有的更新列都需要满足更新、查询分离；</li>
+</ol>
+</blockquote>
+<p>查看一下的执行计划</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">update</span> users <span style="font-weight:bold">set</span> a = ? <span style="font-weight:bold">where</span> b = ? <span style="font-weight:bold">and</span> <span style="font-weight:bold">c</span> = ? <span style="font-weight:bold">and</span> d = ?
+</span></span></code></pre></div><ul>
+<li><code>BATCH_PARAM_OPT = 0</code> 时候的计划
+<img src="/database/batch-param-opt-04.png" alt="alt text"></li>
+<li><code>BATCH_PARAM_OPT = 1</code> 时候的计划
+<img src="/database/batch-param-opt-05.png" alt="">
+依旧可以看到，将插入的参数转换为参数表并且与 <code>USERS</code> 做 <code>HASH</code> 连接。这样可以免于将 <code>USERS</code> 扫描 100w 次，只需要扫描一次即可。</li>
+</ul>
+<p>等于将此 SQL 改写成了</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">update</span> users <span style="font-weight:bold">set</span> a = <span style="font-style:italic">&#34;PARAM#0000#COL0&#34;</span> <span style="font-weight:bold">from</span> SYSDBA.<span style="font-style:italic">&#34;DM_PARAM_TABLE$&#34;</span> <span style="font-weight:bold">where</span> ( users.b = <span style="font-style:italic">&#34;PARAM#0000#COL1&#34;</span> <span style="font-weight:bold">and</span> users.<span style="font-weight:bold">c</span> = <span style="font-style:italic">&#34;PARAM#0000#COL2&#34;</span> <span style="font-weight:bold">and</span> users.d = <span style="font-style:italic">&#34;PARAM#0000#COL3&#34;</span> )
+</span></span></code></pre></div><p>这时，其实就有个问题了，假如我对一列进行多次更新，如何保证最后结果集的正确。按照研发说的话，服务端会先使用参数表优化执行，然后 <code>PSCN</code> 会检查是否有重复行，如果有重复行，则返回 <code>EC_SRC_MULTI_ROWS</code> 给客户端，然后以非批量的方式重新执行。</p>
+<p>测试如下 Java 代码</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-java" data-lang="java"><span style="display:flex;"><span>preparedStatement.setInt(1, 2);
+</span></span><span style="display:flex;"><span>preparedStatement.setString(2, <span style="font-style:italic">&#34;1&#34;</span>);
+</span></span><span style="display:flex;"><span>preparedStatement.setInt(3, 1);
+</span></span><span style="display:flex;"><span>preparedStatement.setInt(4, 1);
+</span></span><span style="display:flex;"><span>preparedStatement.addBatch();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>preparedStatement.setInt(1, 4);
+</span></span><span style="display:flex;"><span>preparedStatement.setString(2, <span style="font-style:italic">&#34;1&#34;</span>);
+</span></span><span style="display:flex;"><span>preparedStatement.setInt(3, 1);
+</span></span><span style="display:flex;"><span>preparedStatement.setInt(4, 1);
+</span></span><span style="display:flex;"><span>preparedStatement.addBatch();
+</span></span></code></pre></div><p>最后会是将 a 的值更新为 2 还是 4 呢？来看下 sqllog 的截图
+<img src="/database/batch-param-opt-06.png" alt="alt text">
+首先使用了 <code>PSCN</code> 优化，但是途中报错 <code>-5004</code>，然后去掉了 <code>PSCN</code> 优化，重新执行。
+<code>-5004</code> 的含义为：无法在源表中获得一组稳定的行，因为我的 <code>where</code> 条件是相同的，所以会获得两行，确实报错。所以说，他不会单纯的对比参数表的整行数据，因为我更新的值是不一致的，他会对比 <code>where</code> 之后条件那一行的数据。</p>
+<blockquote>
+<p>[!CAUTION]
+其实目前就有一个很蠢的问题了，刷盘和重复值都会报错，而且都是 <code>EC_SRC_MULTI_ROWS</code> ，那我如何判断现在到底是什么报错呢？</p>
+</blockquote>
+<h4 id="delete-优化原理"><code>DELETE</code> 优化原理</h4>
+<blockquote>
+<p>[!NOTE]
+如果需要优化删除需要满足以下条件</p>
+<ol>
+<li>需要时查询删除，不能是游标删除（将查询结果集存入游标中）；</li>
+<li>查询条件不包含 <code>rownum</code>；</li>
+<li><code>delete from users where a &gt; ? and a &lt; ?</code> 这种复杂查询的时候；</li>
+</ol>
+</blockquote>
+<p>使用如下 SQL，查一下执行计划</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">delete</span> <span style="font-weight:bold">from</span> users <span style="font-weight:bold">where</span> a = ? <span style="font-weight:bold">and</span> b = ? <span style="font-weight:bold">and</span> <span style="font-weight:bold">c</span> = ? <span style="font-weight:bold">and</span> d = ?
+</span></span></code></pre></div><ul>
+<li><code>BATCH_PARAM_OPT = 0</code> 时候的计划
+<img src="/database/batch-param-opt-07.png" alt="alt text"></li>
+<li><code>BATCH_PARAM_OPT = 1</code> 无索引时候的计划
+<img src="/database/batch-param-opt-08.png" alt="alt text"></li>
+<li><code>BATCH_PARAM_OPT = 1</code> 有主键的时候的计划
+<img src="/database/batch-param-opt-09.png" alt="alt text"></li>
+<li><code>BATCH_PARAM_OPT = 1</code> 有唯一非聚集索引时候的计划
+<img src="/database/batch-param-opt-10.png" alt="alt text"></li>
+<li><code>BATCH_PARAM_OPT = 1</code> 有聚集索引时候的计划
+<img src="/database/batch-param-opt-11.png" alt="alt text">
+一样可以通过 <code>users</code> 表的情况（增加索引，增加 hint）来优化删除的 <code>SQL</code>。</li>
+</ul>
+<h3 id="batch_param_opt2-操作符优化"><code>BATCH_PARAM_OPT=2</code> （操作符优化）</h3>
+<p>操作符优化不会改变计划，在保证结果正确的情况下，精简了一些执行流程，比如指令跳转，vm_node 创建、销毁等。</p>
+<p>优化前每行参数通过指令跳转，每行参数都是一次完整的执行，有额外的初始化、销毁代价；
+优化后在 <code>NINS2</code>/<code>NUPD2</code>/<code>NDEL2</code>/<code>NMRG</code> 等操作符内直接加载下一行参数；</p>
+<blockquote>
+<p>[!NOTE]
+几乎没有限制，只是单条语句即可。</p>
+</blockquote>
+<h2 id="实验测试">实验测试</h2>
+<p>我们尽量做一个实验，针对于 <code>BATCH_PARAM_OPT</code> 参数，来做开启优化和不开启优化的对比，以 <code>sqllog</code> 里面的时间为准。
+有以下四种场景：</p>
+<ol>
+<li><code>INSERT</code></li>
+<li><code>UPDATE</code></li>
+<li><code>DELETE</code></li>
+</ol>
+<p>为了方便，本次测试使用 Java 代码中的 <code>batchExecute</code> 接口进行测试。以下所有测试时间都是通过 vpn 连接至数据库服务器上，有延迟是很正常的现象，并且只测试了一次，有误差也是很正常的现象，大致趋势没有问题即可。
+本次测试只是为了心中对 <code>BATCH_PARAM_OPT</code> 优化速度有个预估而已。</p>
+<h3 id="insert-测试">INSERT 测试</h3>
+<p>表结构如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">create</span> <span style="font-weight:bold">table</span> users (
+</span></span><span style="display:flex;"><span>  a int,
+</span></span><span style="display:flex;"><span>  b varchar(10000),
+</span></span><span style="display:flex;"><span>  <span style="font-weight:bold">c</span> bigint,
+</span></span><span style="display:flex;"><span>  d decimal(16, 2)
+</span></span><span style="display:flex;"><span>);
+</span></span></code></pre></div><p>Java 代码如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-java" data-lang="java"><span style="display:flex;"><span><span style="font-weight:bold">public</span> <span style="font-weight:bold">class</span> <span style="font-weight:bold">Main</span> {
+</span></span><span style="display:flex;"><span>    <span style="font-weight:bold">public</span> <span style="font-weight:bold">static</span> <span style="">void</span> main(String[] args) <span style="font-weight:bold">throws</span> ClassNotFoundException, SQLException {
+</span></span><span style="display:flex;"><span>        System.setProperty(<span style="font-style:italic">&#34;socksProxyHost&#34;</span>, <span style="font-style:italic">&#34;192.168.15.101&#34;</span>);
+</span></span><span style="display:flex;"><span>        System.setProperty(<span style="font-style:italic">&#34;socksProxyPort&#34;</span>, <span style="font-style:italic">&#34;1080&#34;</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        String jdbcString = <span style="font-style:italic">&#34;dm.jdbc.driver.DmDriver&#34;</span>;
+</span></span><span style="display:flex;"><span>        String urlString = <span style="font-style:italic">&#34;jdbc:dm://10.76.11.205:65236&#34;</span>;
+</span></span><span style="display:flex;"><span>        String username = <span style="font-style:italic">&#34;SYSDBA&#34;</span>;
+</span></span><span style="display:flex;"><span>        String password = <span style="font-style:italic">&#34;DMDBA_hust4400&#34;</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        String batchInsertSql = <span style="font-style:italic">&#34;INSERT INTO USERS VALUES ( ?, ?, ?, ? )&#34;</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        Class.forName(jdbcString);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        Connection connection = DriverManager.getConnection(urlString, username, password);
+</span></span><span style="display:flex;"><span>        PreparedStatement preparedStatement = connection.prepareStatement(batchInsertSql);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="font-weight:bold">for</span> (<span style="">int</span> i = 0; i &lt; 1000000; i ++) {
+</span></span><span style="display:flex;"><span>            preparedStatement.setInt(1, i);
+</span></span><span style="display:flex;"><span>            preparedStatement.setString(2, String.valueOf(i));
+</span></span><span style="display:flex;"><span>            preparedStatement.setInt(3, i);
+</span></span><span style="display:flex;"><span>            preparedStatement.setInt(4, i);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>            preparedStatement.addBatch();
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        preparedStatement.executeBatch();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        preparedStatement.close();
+</span></span><span style="display:flex;"><span>        connection.close();
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>以上代码会批量插入一百万数据。最好是先执行一次，然后 truncate users 表，然后再重新插入一下。以防止数据页申请的消耗。</p>
+<ul>
+<li><code>BATCH_PARAM_OPT = 0</code> 执行时间为 30877ms；</li>
+<li><code>BATCH_PARAM_OPT = 1</code> 执行时间为 468ms；</li>
+<li><code>BATCH_PARAM_OPT = 2</code> 执行时间为 26295ms；</li>
+</ul>
+<p><code>BATCH_PARAM_OPT = 0</code> 的 sqllog 截图。
+<img src="/database/batch-param-opt-12.png" alt="alt text">
+<code>BATCH_PARAM_OPT = 1</code> 的 sqllog 截图。
+<img src="/database/batch-param-opt-13.png" alt="alt text">
+<code>BATCH_PARAM_OPT = 2</code> 的 sqllog 截图。
+<img src="/database/batch-param-opt-14.png" alt="alt text">
+三种取值的柱状图如下
+<img src="/database/batch-param-opt-15.png" alt="alt text"></p>
+<blockquote>
+<p>[!WARNING]</p>
+<ol>
+<li>只能是单组值的批量插入，只能是 <code>insert into test values ( ? )</code>，不能是 <code>insert into test values ( ? ), ( ? )</code>，也不能是 <code>insert into test select a from test_1</code>；但是为啥不支持这个优化呢？</li>
+<li>插入的时候不能带默认值，也就是不能是 <code>insert into test values ( ?, DEFAULT )</code>；</li>
+</ol>
+</blockquote>
+<p><img src="/database/batch-param-opt-16.png" alt="alt text">
+<code>insert into users values ( ? ), ( ? )</code> 确实是不支持优化。
+<img src="/database/batch-param-opt-17.png" alt="alt text">
+同样，<code>insert into users values ( ?, ?, ?, default )</code> 也确实不支持优化。</p>
+<h3 id="update-测试"><code>UPDATE</code> 测试</h3>
+<p>表结构同上，同样插入上面的 100w 数据。<code>UPDATE</code> SQL 如下</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">UPDATE</span> USERS <span style="font-weight:bold">SET</span> A = ? <span style="font-weight:bold">WHERE</span> B = ? <span style="font-weight:bold">AND</span> <span style="font-weight:bold">C</span> = ? <span style="font-weight:bold">AND</span> D = ?
+</span></span></code></pre></div><h4 id="不存在唯一索引的情况">不存在唯一索引的情况</h4>
+<p><code>UPDATE</code> 可以直接执行，不需要 truncate 然后重新插入。但是 update 100w 数据跑不出来，所以目前只测试 1w 的数据。</p>
+<ul>
+<li><code>BATCH_PARAM_OPT = 0</code> 执行时间为 695759ms；</li>
+<li><code>BATCH_PARAM_OPT = 1</code> 执行时间为 162ms；</li>
+<li><code>BATCH_PARAM_OPT = 2</code> 执行时间为 674550ms；</li>
+</ul>
+<p><code>BATCH_PARAM_OPT = 0</code> 的 sqllog 截图
+<img src="/database/batch-param-opt-18.png" alt="alt text">
+<code>BATCH_PARAM_OPT = 1</code> 的 sqllog 截图
+<img src="/database/batch-param-opt-19.png" alt="alt text">
+<code>BATCH_PARAM_OPT = 2</code> 的 sqllog 截图
+<img src="/database/batch-param-opt-20.png" alt="alt text"></p>
+<p>三种取值的柱状图如下
+<img src="/database/batch-param-opt-21.png" alt="alt text"></p>
+<blockquote>
+<p>[!WARNING]</p>
+<ol>
+<li>如果 where 条件出现了更新列，则不能优化；<code>update users set a = b+1 where a = ?</code></li>
+<li>如果 where 条件是非等值条件，则不能优化；（批量绑定中，会对同一行反复更新，后一次更新会依赖前一次更新，所以不能优化）<code>update users set a = a+1 where b &gt; ?</code></li>
+</ol>
+</blockquote>
+<p><img src="/database/batch-param-opt-22.png" alt="alt text">
+<code>update users set a = b+1 where a = ?</code> 无法优化。
+<img src="/database/batch-param-opt-23.png" alt="alt text">
+<code>update users set a = a+1 where b &gt; ?</code> 确实无法优化。</p>
+<h4 id="存在唯一索引的情况">存在唯一索引的情况</h4>
+<p>创建如下唯一索引</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">create</span> <span style="font-weight:bold">unique</span> <span style="font-weight:bold">index</span> u_idx_users_b_lg <span style="font-weight:bold">on</span> users(b);
+</span></span></code></pre></div><p>插入 100w 数据后，执行上述代码进行更新，但是数据量改为 100w</p>
+<ul>
+<li><code>BATCH_PARAM_OPT = 0</code> 的执行时间为 64327ms；</li>
+<li><code>BATCH_PARAM_OPT = 1</code> 的执行时间为 4645ms；</li>
+<li><code>BATCH_PARAM_OPT = 2</code> 的执行时间为 52973ms；</li>
+</ul>
+<p><code>BATCH_PARAM_OPT = 0</code> 的 sqllog 截图
+<img src="/database/batch-param-opt-24.png" alt="alt text">
+<code>BATCH_PARAM_OPT = 1</code> 的 sqllog 截图
+执行计划为
+<img src="/database/batch-param-opt-25.png" alt="alt text">
+速度为
+<img src="/database/batch-param-opt-26.png" alt="alt text">
+此时测试一下 100w 不带唯一索引的速度
+<img src="/database/batch-param-opt-27.png" alt="alt text">
+其实非常近似，执行计划为
+<img src="/database/batch-param-opt-28.png" alt="alt text">
+所以可以发现，带不带唯一索引其实对 <code>BATCH_PARAM_OPT = 1</code> 的执行计划<del>没有关系</del>，所以执行时间非常近似。
+其实也有一些关系，当把索引改成全列索引时，就会走 <code>SSCN</code>，从而减少扫描页数来优化执行速度。
+<img src="/database/batch-param-opt-29.png" alt="alt text">
+<img src="/database/batch-param-opt-30.png" alt="alt text">
+<code>BATCH_PARAM_OPT = 2</code> 的 sqllog 截图
+<img src="/database/batch-param-opt-31.png" alt="alt text">
+三种取值的柱状图如下
+<img src="/database/batch-param-opt-32.png" alt="alt text"></p>
+<h3 id="delete-测试"><code>DELETE</code> 测试</h3>
+<p>表结构同上，同样插入上面的 100w 数据。<code>DELETE</code> SQL 如下</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">delete</span> <span style="font-weight:bold">from</span> users <span style="font-weight:bold">where</span> a = ? <span style="font-weight:bold">and</span> b = ? <span style="font-weight:bold">and</span> <span style="font-weight:bold">c</span> = ? <span style="font-weight:bold">and</span> d = ?
+</span></span></code></pre></div><p>新建一个唯一索引</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">create</span> <span style="font-weight:bold">unique</span> <span style="font-weight:bold">index</span> uidx_users_a_dmlg <span style="font-weight:bold">on</span> users (a);
+</span></span></code></pre></div><p>每次执行的时候，都需要先插入 100w 数据，然后再执行 <code>delete</code></p>
+<ul>
+<li><code>BATCH_PARAM_OPT = 0</code> 的执行时间为 27379ms；</li>
+<li><code>BATCH_PARAM_OPT = 1</code> 的执行时间为 11650ms；</li>
+<li><code>BATCH_PARAM_OPT = 2</code> 的执行时间为 16954ms；</li>
+</ul>
+<p><code>BATCH_PARAM_OPT = 0</code> 的 sqllog 的截图
+<img src="/database/batch-param-opt-33.png" alt="alt text">
+<img src="/database/batch-param-opt-34.png" alt="alt text">
+<code>BATCH_PARAM_OPT = 1</code> 的 sqllog 的截图
+<img src="/database/batch-param-opt-35.png" alt="alt text">
+<img src="/database/batch-param-opt-36.png" alt="alt text">
+<code>BATCH_PARAM_OPT = 2</code> 的 sqllog 的截图
+<img src="/database/batch-param-opt-37.png" alt="alt text">
+<img src="/database/batch-param-opt-38.png" alt="alt text">
+三种取值的柱状图如下
+<img src="/database/batch-param-opt-39.png" alt="alt text"></p>
+
+        </div>
+
+        <div class="row middle-xs">
+          <div class="col-xs-12">
+            
+          </div>
+        </div>
+        
+          <div class="row">
+            <div class="col-xs-12">
+              
+            </div>
+          </div>
+
+          
+
+
+
+          
+          
+          <div style="height: 50px;"></div>
+          
+        
+
+        <div class="site-footer">
+  
+  
+</div>
+
+      </div>
+    </div>
+  </article>
+
+  
+<script>
+  
+  document.addEventListener("DOMContentLoaded", function() {
+    const disqus = document.getElementById('disqus_thread');
+    if (!disqus) {
+      return;
+    }
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        const iframes = disqus.getElementsByTagName('iframe');
+        if (iframes.length > 1) {
+          const commentsIframe = iframes[1];
+          while (disqus.firstChild) {
+            disqus.removeChild(disqus.firstChild);
+          }
+          disqus.appendChild(commentsIframe);
+          observer.disconnect();
+        }
+      });
+    });
+    observer.observe(disqus, { childList: true, subtree: true });
+  });
+</script>
+
+  
+
+</body>
+
+</html>

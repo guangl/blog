@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en-us" prefix="og: http://ogp.me/ns#">
+<html lang="en">
 <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
   <meta charset="utf-8" />
   <meta name="generator" content="Hugo 0.151.2">
@@ -7,8 +7,8 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="author" content="" />
-  <meta property="og:url" content="http://localhost:1313/" />
-  <link rel="canonical" href="http://localhost:1313/" /><link
+  <meta property="og:url" content="http://localhost:1313/posts/database-cache/" />
+  <link rel="canonical" href="http://localhost:1313/posts/database-cache/" /><link
     rel="alternate"
     type="application/atom+xml"
     href="http://localhost:1313/index.xml"
@@ -23,10 +23,10 @@
            "@type": "WebPage",
            "@id": "http:\/\/localhost:1313\/"
       },
-      "articleSection" : "",
-      "name" : "guangluo\u0027s blog",
-      "headline" : "guangluo\u0027s blog",
-      "description" : "",
+      "articleSection" : "posts",
+      "name" : "数据库缓存",
+      "headline" : "数据库缓存",
+      "description" : "数据库缓存的作用就是减少 SQL 实际执行次数，只需要返回缓存的结果即可，这样可以减少数据库的压力，提高系统的性能。\n达梦数据库缓存支持两种：\n服务端缓存； 客户端缓存； 服务端缓存 服务端缓存是指应用会接触到数据库层，但是不会执行具体 SQL 语句，而是直接返回缓存的结果。\n开启方法 我们使以下 SQL 走缓存\nSELECT * FROM TEST WHERE A = 1; 准备表结构，插入数据\nCREATE TABLE TEST ( A INT, B VARCHAR(255) ); INSERT INTO TEST VALUES ( 1, \u0026#39;AA\u0026#39; ); INSERT INTO TEST VALUES ( 2, \u0026#39;BB\u0026#39; ); COMMIT; 在 dm.ini 文件中修改以下参数，重启数据库\nRS_CAN_CACHE = 1 RS_CACHE_TABLES = TEST BUILD_FORWARD_RS = 1 此时执行两次准备的 SQL，观察执行号，如果第二次执行号为 0，根据经验说明走了缓存。\n第一次执行截图如下 第二次执行截图如下，说明走了缓存 [!NOTE] 如果你观察仔细的话，就会发现，数据库 sqllog 的 EXEC_ID 与实际的 EXEC_ID 其实并不一致，就比如开启了服务端缓存，实际的 EXEC_ID 是 0，但是 sqllog 中是 -1。\n只能说有点 太蠢了，属于是没有整体设计，负责 sqllog 的人和负责 EXEC_ID 的人没有沟通。\n",
       "inLanguage" : "en-US",
       "author" : "",
       "creator" : "",
@@ -34,17 +34,41 @@
       "accountablePerson" : "",
       "copyrightHolder" : "",
       "copyrightYear" : "2025",
-      "datePublished": "2025-10-23 17:12:01 \u002b0800 CST",
-      "dateModified" : "2025-10-23 17:12:01 \u002b0800 CST",
-      "url" : "http:\/\/localhost:1313\/",
+      "datePublished": "2025-10-23 17:03:53 \u002b0800 CST",
+      "dateModified" : "2025-10-23 17:03:53 \u002b0800 CST",
+      "url" : "http:\/\/localhost:1313\/posts\/database-cache\/",
       "keywords" : [  ]
   }
 </script>
-<title>guangluo&#39;s blog</title>
-  <meta property="og:title" content="guangluo&#39;s blog" />
-  <meta property="og:type" content="website" />
-  <meta property="og:description" content="" />
-  <meta name="description" content="" />
+<title>数据库缓存</title>
+  <meta property="og:title" content="数据库缓存" />
+  <meta property="og:type" content="article" />
+  <meta
+    property="og:description"
+    content="数据库缓存的作用就是减少 SQL 实际执行次数，只需要返回缓存的结果即可，这样可以减少数据库的压力，提高系统的性能。
+达梦数据库缓存支持两种：
+服务端缓存； 客户端缓存； 服务端缓存 服务端缓存是指应用会接触到数据库层，但是不会执行具体 SQL 语句，而是直接返回缓存的结果。
+开启方法 我们使以下 SQL 走缓存
+SELECT * FROM TEST WHERE A = 1; 准备表结构，插入数据
+CREATE TABLE TEST ( A INT, B VARCHAR(255) ); INSERT INTO TEST VALUES ( 1, &#39;AA&#39; ); INSERT INTO TEST VALUES ( 2, &#39;BB&#39; ); COMMIT; 在 dm.ini 文件中修改以下参数，重启数据库
+RS_CAN_CACHE = 1 RS_CACHE_TABLES = TEST BUILD_FORWARD_RS = 1 此时执行两次准备的 SQL，观察执行号，如果第二次执行号为 0，根据经验说明走了缓存。
+第一次执行截图如下 第二次执行截图如下，说明走了缓存 [!NOTE] 如果你观察仔细的话，就会发现，数据库 sqllog 的 EXEC_ID 与实际的 EXEC_ID 其实并不一致，就比如开启了服务端缓存，实际的 EXEC_ID 是 0，但是 sqllog 中是 -1。
+只能说有点 太蠢了，属于是没有整体设计，负责 sqllog 的人和负责 EXEC_ID 的人没有沟通。
+"
+  />
+  <meta
+    name="description"
+    content="数据库缓存的作用就是减少 SQL 实际执行次数，只需要返回缓存的结果即可，这样可以减少数据库的压力，提高系统的性能。
+达梦数据库缓存支持两种：
+服务端缓存； 客户端缓存； 服务端缓存 服务端缓存是指应用会接触到数据库层，但是不会执行具体 SQL 语句，而是直接返回缓存的结果。
+开启方法 我们使以下 SQL 走缓存
+SELECT * FROM TEST WHERE A = 1; 准备表结构，插入数据
+CREATE TABLE TEST ( A INT, B VARCHAR(255) ); INSERT INTO TEST VALUES ( 1, &#39;AA&#39; ); INSERT INTO TEST VALUES ( 2, &#39;BB&#39; ); COMMIT; 在 dm.ini 文件中修改以下参数，重启数据库
+RS_CAN_CACHE = 1 RS_CACHE_TABLES = TEST BUILD_FORWARD_RS = 1 此时执行两次准备的 SQL，观察执行号，如果第二次执行号为 0，根据经验说明走了缓存。
+第一次执行截图如下 第二次执行截图如下，说明走了缓存 [!NOTE] 如果你观察仔细的话，就会发现，数据库 sqllog 的 EXEC_ID 与实际的 EXEC_ID 其实并不一致，就比如开启了服务端缓存，实际的 EXEC_ID 是 0，但是 sqllog 中是 -1。
+只能说有点 太蠢了，属于是没有整体设计，负责 sqllog 的人和负责 EXEC_ID 的人没有沟通。
+"
+  />
   <meta property="og:locale" content="en-us" /><meta property="og:image" content="" />
   
   
@@ -69,10 +93,11 @@
 
 
 <body>
-  <article class="posts">
+  <article class="post " id="article">
     <div class="row">
       <div class="col-xs-12">
-        
+        <div class="site-header">
+          
 <header>
   <div class="header-title">
     <a href="/"
@@ -93,190 +118,148 @@
 </div>
 <div class="header-line"></div>
 
-        <div id="posts-list">
-          <section>
-            <h1 class="site-date-catalog">2025</h1>
-
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:12:01 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/batch-param-opt/">BATCH_PARAM_OPT</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:03:53 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/database-cache/">数据库缓存</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:03:09 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/view-filter-merging/">VIEW_FILTER_MERGING</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:01:59 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/complex-view-merging/">COMPLEX_VIEW_MERGING</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:01:12 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/dm-thread/">达梦数据库单机线程</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:00:41 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/mysql-installation/">Mysql 安装</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:00:05 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/postgres-installation/">Postgres 安装</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:58:16 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/axios-post-packaging/">Axios 二次封装</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:57:43 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/shui-diao-ge-tou/">水调歌头</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:56:46 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/work-consumerism-and-the-new-poor/">工作、消费、新穷人</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:56:10 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/on-protracted-war/">论持久战</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-          </section>
-          
         </div>
+        <header class="post-header">
+          <h1 class="post-title">数据库缓存</h1>
+          
+          <div class="row post-desc">
+            <div class="col-xs-6">
+              
+              <time class="post-date" datetime="2025-10-23 17:03:53 CST">
+                23 Oct 2025
+              </time>
+              
+            </div>
+            <div class="col-xs-6">
+              
+            </div>
+          </div>
+          
+        </header>
+
+        <div class="post-content markdown-body">
+          
+          <p>数据库缓存的作用就是减少 SQL 实际执行次数，只需要返回缓存的结果即可，这样可以减少数据库的压力，提高系统的性能。</p>
+<p>达梦数据库缓存支持两种：</p>
+<ol>
+<li>服务端缓存；</li>
+<li>客户端缓存；</li>
+</ol>
+<h2 id="服务端缓存">服务端缓存</h2>
+<p>服务端缓存是指应用会接触到数据库层，但是不会执行具体 SQL 语句，而是直接返回缓存的结果。</p>
+<h3 id="开启方法">开启方法</h3>
+<p>我们使以下 SQL 走缓存</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">SELECT</span> * <span style="font-weight:bold">FROM</span> TEST <span style="font-weight:bold">WHERE</span> A = 1;
+</span></span></code></pre></div><p>准备表结构，插入数据</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">CREATE</span> <span style="font-weight:bold">TABLE</span> TEST ( A INT, B VARCHAR(255) );
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">INSERT</span> <span style="font-weight:bold">INTO</span> TEST <span style="font-weight:bold">VALUES</span> ( 1, <span style="font-style:italic">&#39;AA&#39;</span> );
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">INSERT</span> <span style="font-weight:bold">INTO</span> TEST <span style="font-weight:bold">VALUES</span> ( 2, <span style="font-style:italic">&#39;BB&#39;</span> );
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">COMMIT</span>;
+</span></span></code></pre></div><p>在 <code>dm.ini</code> 文件中修改以下参数，重启数据库</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-ini" data-lang="ini"><span style="display:flex;"><span>RS_CAN_CACHE      = <span style="font-style:italic">1</span>
+</span></span><span style="display:flex;"><span>RS_CACHE_TABLES   = <span style="font-style:italic">TEST</span>
+</span></span><span style="display:flex;"><span>BUILD_FORWARD_RS  = <span style="font-style:italic">1</span>
+</span></span></code></pre></div><p>此时执行两次准备的 SQL，观察执行号，如果第二次执行号为 0，根据经验说明走了缓存。</p>
+<p>第一次执行截图如下
+<img src="/database/database-cache-01.png" alt="database-cache-01"></p>
+<p>第二次执行截图如下，说明走了缓存
+<img src="/database/database-cache-02.png" alt="database-cache-02"></p>
+<blockquote>
+<p>[!NOTE]
+如果你观察仔细的话，就会发现，数据库 sqllog 的 <code>EXEC_ID</code> 与实际的 <code>EXEC_ID</code> 其实并不一致，就比如开启了服务端缓存，实际的 <code>EXEC_ID</code> 是 <code>0</code>，但是 sqllog 中是 <code>-1</code>。</p>
+<p>只能说有点 <strong>太蠢了</strong>，属于是没有整体设计，负责 sqllog 的人和负责 <code>EXEC_ID</code> 的人没有沟通。</p>
+</blockquote>
+<h3 id="原理解析">原理解析</h3>
+<p>讲道理，我也想知道，但是没有资料。</p>
+<h3 id="注意事项">注意事项</h3>
+<p>在以下情况下，服务端不支持结果集缓存：</p>
+<ol>
+<li>必须是单纯的查询语句；</li>
+<li>查询语句的计划也必须是缓存的；</li>
+<li>守护环境中的备库不支持结果集缓存；</li>
+<li>查询语句中包含以下任意一项，结果集都不能缓存：
+<ul>
+<li>临时表；</li>
+<li>包含序列的 CURVAL 或者 NEXTVAL；</li>
+<li>包含非确定的 SQL 函数；</li>
+<li>包含RAND、SYSDATE 等返回值实时变化的系统函数；</li>
+<li>其他一些实时要素；</li>
+</ul>
+</li>
+</ol>
+<h2 id="客户端缓存">客户端缓存</h2>
+<p>客户端缓存是在服务端缓存的基础上开启的。</p>
+<blockquote>
+<p>[!DANGER]
+虽然我并不知道这两者有什么关系。</p>
+<p>客户端缓存应该直接在驱动层就做了 hashmap 用于缓存了吧，都不会经过数据库，不能理解为什么客户端需要判断服务端是否缓存。</p>
+</blockquote>
+<h3 id="开启方法-1">开启方法</h3>
+<p>由于需要服务端也进行缓存，所以咱们沿用服务端缓存的例子，使用 <code>jdbc</code> 驱动来开启客户端缓存。</p>
+<p>在 <code>dm.ini</code> 文件中修改以下参数，重启数据库</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-ini" data-lang="ini"><span style="display:flex;"><span>CLT_CACHE_TABLES  = <span style="font-style:italic">SYSDBA.TEST # 一定要加上模式名</span>
+</span></span></code></pre></div><p>代码如下</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-java" data-lang="java"><span style="display:flex;"><span><span style="font-weight:bold">public</span> <span style="font-weight:bold">class</span> <span style="font-weight:bold">Main</span> {
+</span></span><span style="display:flex;"><span>    <span style="font-weight:bold">public</span> <span style="font-weight:bold">static</span> <span style="">void</span> main(String[] args) <span style="font-weight:bold">throws</span> SQLException, ClassNotFoundException {
+</span></span><span style="display:flex;"><span>        String jdbcString = <span style="font-style:italic">&#34;dm.jdbc.driver.DmDriver&#34;</span>;
+</span></span><span style="display:flex;"><span>        String urlString = <span style="font-style:italic">&#34;jdbc:dm://127.0.0.1:5236?ENABLE_RS_CACHE=1&#34;</span>;
+</span></span><span style="display:flex;"><span>        String username = <span style="font-style:italic">&#34;SYSDBA&#34;</span>;
+</span></span><span style="display:flex;"><span>        String password = <span style="font-style:italic">&#34;SYSDBA&#34;</span>;
+</span></span><span style="display:flex;"><span>        String sql = <span style="font-style:italic">&#34;SELECT * FROM TEST WHERE A = 1&#34;</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        Class.forName(jdbcString);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        Connection connect = DriverManager.getConnection(urlString, username, password);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        Statement statement = connect.createStatement();
+</span></span><span style="display:flex;"><span>        ResultSet resultSet = statement.executeQuery(sql);
+</span></span><span style="display:flex;"><span>        resultSet.close();
+</span></span><span style="display:flex;"><span>        statement.close();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        Statement statement1 = connect.createStatement();
+</span></span><span style="display:flex;"><span>        ResultSet resultSet1 = statement1.executeQuery(sql);
+</span></span><span style="display:flex;"><span>        resultSet1.close();
+</span></span><span style="display:flex;"><span>        statement1.close();
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><blockquote>
+<p>[!NOTE]
+需要在一个连接里面才可以走结果集缓存。</p>
+</blockquote>
+<h3 id="原理解析-1">原理解析</h3>
+<p><code>debug</code> 第一个 <code>statement</code> 就可以发现，此时已经把结果集加入到 <code>DmdbResultSetCachePool</code> 中了。</p>
+<p><img src="/database/database-cache-03.png" alt="client-result-cache-add"></p>
+<p>此类提供了一个专属的 <code>Map</code> 来存放结果集。</p>
+<p><img src="/database/database-cache-04.png" alt="client-result-cache"></p>
+<p>并且，在每次创建 <code>statement</code> 的时候均会判断是否使用了客户端缓存、是否存在客户端缓存。</p>
+<p><img src="/database/database-cache-05.png" alt="是否存在客户端缓存"></p>
+<p><img src="/database/database-cache-06.png" alt="是否使用客户端缓存"></p>
+<h3 id="注意事项-1">注意事项</h3>
+<p>一定要开服务端结果集缓存。</p>
+
+        </div>
+
+        <div class="row middle-xs">
+          <div class="col-xs-12">
+            
+          </div>
+        </div>
+        
+          <div class="row">
+            <div class="col-xs-12">
+              
+            </div>
+          </div>
+
+          
+
+
+
+          
+          
+          <div style="height: 50px;"></div>
+          
+        
 
         <div class="site-footer">
   
@@ -311,6 +294,8 @@
     observer.observe(disqus, { childList: true, subtree: true });
   });
 </script>
+
+  
 
 </body>
 

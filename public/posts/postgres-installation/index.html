@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en-us" prefix="og: http://ogp.me/ns#">
+<html lang="en">
 <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
   <meta charset="utf-8" />
   <meta name="generator" content="Hugo 0.151.2">
@@ -7,8 +7,8 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="author" content="" />
-  <meta property="og:url" content="http://localhost:1313/" />
-  <link rel="canonical" href="http://localhost:1313/" /><link
+  <meta property="og:url" content="http://localhost:1313/posts/postgres-installation/" />
+  <link rel="canonical" href="http://localhost:1313/posts/postgres-installation/" /><link
     rel="alternate"
     type="application/atom+xml"
     href="http://localhost:1313/index.xml"
@@ -23,10 +23,10 @@
            "@type": "WebPage",
            "@id": "http:\/\/localhost:1313\/"
       },
-      "articleSection" : "",
-      "name" : "guangluo\u0027s blog",
-      "headline" : "guangluo\u0027s blog",
-      "description" : "",
+      "articleSection" : "posts",
+      "name" : "Postgres 安装",
+      "headline" : "Postgres 安装",
+      "description" : "安装 在 red hat family 中安装 postgres-16\ndnf install -y https:\/\/download.postgresql.org\/pub\/repos\/yum\/reporpms\/EL-9-x86_64\/pgdg-redhat-repo-latest.noarch.rpm dnf -qy module disable postgresql dnf install -y postgresql16-server \/usr\/pgsql-16\/bin\/postgresql-16-setup initdb systemctl enable postgresql-16 systemctl start postgresql-16 创建 Test 角色 -- 在 postgres 创建角色，角色无法登录 CREATE ROLE TEST; -- 将 test 具有 login 权限 ALTER ROLE TEST LOGIN; -- 将 superuser 的权限赋权给 test ALTER ROLE TEST SUPERUSER; -- 创建 TESTDB 数据库 CREATE DATABASE TESTDB OWNER TEST; -- 修改 TEST 密码 ALTER USER TEST WITH PASSWORD \u0026#39;TEST\u0026#39;; 使 Test 用户可以远程登录 将 pg_hba.conf 中增加一行：\n",
       "inLanguage" : "en-US",
       "author" : "",
       "creator" : "",
@@ -34,17 +34,27 @@
       "accountablePerson" : "",
       "copyrightHolder" : "",
       "copyrightYear" : "2025",
-      "datePublished": "2025-10-23 17:12:01 \u002b0800 CST",
-      "dateModified" : "2025-10-23 17:12:01 \u002b0800 CST",
-      "url" : "http:\/\/localhost:1313\/",
+      "datePublished": "2025-10-23 17:00:05 \u002b0800 CST",
+      "dateModified" : "2025-10-23 17:00:05 \u002b0800 CST",
+      "url" : "http:\/\/localhost:1313\/posts\/postgres-installation\/",
       "keywords" : [  ]
   }
 </script>
-<title>guangluo&#39;s blog</title>
-  <meta property="og:title" content="guangluo&#39;s blog" />
-  <meta property="og:type" content="website" />
-  <meta property="og:description" content="" />
-  <meta name="description" content="" />
+<title>Postgres 安装</title>
+  <meta property="og:title" content="Postgres 安装" />
+  <meta property="og:type" content="article" />
+  <meta
+    property="og:description"
+    content="安装 在 red hat family 中安装 postgres-16
+dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm dnf -qy module disable postgresql dnf install -y postgresql16-server /usr/pgsql-16/bin/postgresql-16-setup initdb systemctl enable postgresql-16 systemctl start postgresql-16 创建 Test 角色 -- 在 postgres 创建角色，角色无法登录 CREATE ROLE TEST; -- 将 test 具有 login 权限 ALTER ROLE TEST LOGIN; -- 将 superuser 的权限赋权给 test ALTER ROLE TEST SUPERUSER; -- 创建 TESTDB 数据库 CREATE DATABASE TESTDB OWNER TEST; -- 修改 TEST 密码 ALTER USER TEST WITH PASSWORD &#39;TEST&#39;; 使 Test 用户可以远程登录 将 pg_hba.conf 中增加一行：
+"
+  />
+  <meta
+    name="description"
+    content="安装 在 red hat family 中安装 postgres-16
+dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm dnf -qy module disable postgresql dnf install -y postgresql16-server /usr/pgsql-16/bin/postgresql-16-setup initdb systemctl enable postgresql-16 systemctl start postgresql-16 创建 Test 角色 -- 在 postgres 创建角色，角色无法登录 CREATE ROLE TEST; -- 将 test 具有 login 权限 ALTER ROLE TEST LOGIN; -- 将 superuser 的权限赋权给 test ALTER ROLE TEST SUPERUSER; -- 创建 TESTDB 数据库 CREATE DATABASE TESTDB OWNER TEST; -- 修改 TEST 密码 ALTER USER TEST WITH PASSWORD &#39;TEST&#39;; 使 Test 用户可以远程登录 将 pg_hba.conf 中增加一行：
+"
+  />
   <meta property="og:locale" content="en-us" /><meta property="og:image" content="" />
   
   
@@ -69,10 +79,11 @@
 
 
 <body>
-  <article class="posts">
+  <article class="post " id="article">
     <div class="row">
       <div class="col-xs-12">
-        
+        <div class="site-header">
+          
 <header>
   <div class="header-title">
     <a href="/"
@@ -93,190 +104,90 @@
 </div>
 <div class="header-line"></div>
 
-        <div id="posts-list">
-          <section>
-            <h1 class="site-date-catalog">2025</h1>
-
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:12:01 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/batch-param-opt/">BATCH_PARAM_OPT</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:03:53 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/database-cache/">数据库缓存</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:03:09 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/view-filter-merging/">VIEW_FILTER_MERGING</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:01:59 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/complex-view-merging/">COMPLEX_VIEW_MERGING</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:01:12 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/dm-thread/">达梦数据库单机线程</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:00:41 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/mysql-installation/">Mysql 安装</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:00:05 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/postgres-installation/">Postgres 安装</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:58:16 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/axios-post-packaging/">Axios 二次封装</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:57:43 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/shui-diao-ge-tou/">水调歌头</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:56:46 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/work-consumerism-and-the-new-poor/">工作、消费、新穷人</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:56:10 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/on-protracted-war/">论持久战</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-          </section>
-          
         </div>
+        <header class="post-header">
+          <h1 class="post-title">Postgres 安装</h1>
+          
+          <div class="row post-desc">
+            <div class="col-xs-6">
+              
+              <time class="post-date" datetime="2025-10-23 17:00:05 CST">
+                23 Oct 2025
+              </time>
+              
+            </div>
+            <div class="col-xs-6">
+              
+            </div>
+          </div>
+          
+        </header>
+
+        <div class="post-content markdown-body">
+          
+          <h2 id="安装">安装</h2>
+<p>在 red hat family 中安装 postgres-16</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>dnf -qy module disable postgresql
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>dnf install -y postgresql16-server
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>/usr/pgsql-16/bin/postgresql-16-setup initdb
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>systemctl enable postgresql-16
+</span></span><span style="display:flex;"><span>systemctl start postgresql-16
+</span></span></code></pre></div><h2 id="创建-test-角色">创建 Test 角色</h2>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-style:italic">-- 在 postgres 创建角色，角色无法登录
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">CREATE</span> <span style="font-weight:bold">ROLE</span> TEST;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 将 test 具有 login 权限
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">ALTER</span> <span style="font-weight:bold">ROLE</span> TEST LOGIN;
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 将 superuser 的权限赋权给 test
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">ALTER</span> <span style="font-weight:bold">ROLE</span> TEST SUPERUSER;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 创建 TESTDB 数据库
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">CREATE</span> <span style="font-weight:bold">DATABASE</span> TESTDB <span style="font-weight:bold">OWNER</span> TEST;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 修改 TEST 密码
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">ALTER</span> <span style="font-weight:bold">USER</span> TEST <span style="font-weight:bold">WITH</span> PASSWORD <span style="font-style:italic">&#39;TEST&#39;</span>;
+</span></span></code></pre></div><h3 id="使-test-用户可以远程登录">使 Test 用户可以远程登录</h3>
+<p>将 pg_hba.conf 中增加一行：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-txt" data-lang="txt"><span style="display:flex;"><span>host testdb test 0.0.0.0/0 password
+</span></span></code></pre></div><p>可使 test 以及 testdb 远程登录。</p>
+<h3 id="配置归档">配置归档</h3>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-style:italic">-- 查询是否开启归档
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">SHOW</span> ARCHIVE_MODE;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 开启归档
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">alter</span> <span style="font-weight:bold">system</span> <span style="font-weight:bold">set</span> wal_level = replica;
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">alter</span> <span style="font-weight:bold">system</span> <span style="font-weight:bold">set</span> archive_mode = <span style="font-weight:bold">on</span>;
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">alter</span> <span style="font-weight:bold">system</span> <span style="font-weight:bold">set</span> archive_command = <span style="font-style:italic">&#39;cp %p /var/lib/pgsql/16/data/pg_arch/%f&#39;</span>;
+</span></span></code></pre></div><p>执行之后需要重启数据库。</p>
+
+        </div>
+
+        <div class="row middle-xs">
+          <div class="col-xs-12">
+            
+          </div>
+        </div>
+        
+          <div class="row">
+            <div class="col-xs-12">
+              
+            </div>
+          </div>
+
+          
+
+
+
+          
+          
+          <div style="height: 50px;"></div>
+          
+        
 
         <div class="site-footer">
   
@@ -311,6 +222,8 @@
     observer.observe(disqus, { childList: true, subtree: true });
   });
 </script>
+
+  
 
 </body>
 

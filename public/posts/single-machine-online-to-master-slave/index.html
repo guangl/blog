@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="utf-8" />
+  <meta name="generator" content="Hugo 0.151.2">
+
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="author" content="" />
+  <meta property="og:url" content="http://localhost:1313/posts/single-machine-online-to-master-slave/" />
+  <link rel="canonical" href="http://localhost:1313/posts/single-machine-online-to-master-slave/" /><link
+    rel="alternate"
+    type="application/atom+xml"
+    href="http://localhost:1313/index.xml"
+    title="guangluo&#39;s blog"
+  />
+
+  <script type="application/ld+json">
+  {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+           "@type": "WebPage",
+           "@id": "http:\/\/localhost:1313\/"
+      },
+      "articleSection" : "posts",
+      "name" : "单机在线转换成主备",
+      "headline" : "单机在线转换成主备",
+      "description" : "目前版本（2025 年第一季度版本 - 8.1.4.80）已经支持单机在线转变为主备集群。\n端口规划 主库的实例名为 DM01，备库的实例名为 DM02。\n实例名 MAL_HOST PORT_NUM MAL_INST_DW_PORT MAL_PORT MAL_DW_PORT DM01 10.76.11.205 65237 65337 65437 65537 DM02 10.76.11.205 65238 65338 65438 65538 安装单机 初始化单机实例：\n.\/dminit path=data instance_name=DM01 db_name=DM01 port_num=65237 page_size=32 extent_size=32 log_size=2048 SYSDBA_PWD=DMDBA_hust4400 SYSAUDITOR_PWD=DMDBA_hust4400 使用 normal\/open 状态启动单机实例：\n.\/dmserver data\/DM01\/dm.ini 如出现以下截图即代表启动成功：\n开启归档 正常安装的时候都会开启归档，所以在这里，我们模拟正常运行过一段时间的单机实例，将归档也打开。\n执行如下命令：\n--开启归档： alter database mount; alter database archivelog; alter database add archivelog \u0026#39;TYPE=LOCAL,DEST=\/data\/DM01\/arch,FILE_SIZE=2048,SPACE_LIMIT=102400\u0026#39;; alter database open; 启动 jmeter 使一个 insert 语句循环执行，用来判断搭建主备的时候，单机数据库是否正常对外服务，可以正常连接、正常执行 SQL。\n先创建表结构：\nCREATE TABLE TEST_LG ( A1 INT, A2 VARCHAR(255), A3 CLOB ); 建立 jmeter 的 workflow，如图下所示：\n",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "2025",
+      "datePublished": "2025-10-23 17:11:02 \u002b0800 CST",
+      "dateModified" : "2025-10-23 17:11:02 \u002b0800 CST",
+      "url" : "http:\/\/localhost:1313\/posts\/single-machine-online-to-master-slave\/",
+      "keywords" : [  ]
+  }
+</script>
+<title>单机在线转换成主备</title>
+  <meta property="og:title" content="单机在线转换成主备" />
+  <meta property="og:type" content="article" />
+  <meta
+    property="og:description"
+    content="目前版本（2025 年第一季度版本 - 8.1.4.80）已经支持单机在线转变为主备集群。
+端口规划 主库的实例名为 DM01，备库的实例名为 DM02。
+实例名 MAL_HOST PORT_NUM MAL_INST_DW_PORT MAL_PORT MAL_DW_PORT DM01 10.76.11.205 65237 65337 65437 65537 DM02 10.76.11.205 65238 65338 65438 65538 安装单机 初始化单机实例：
+./dminit path=data instance_name=DM01 db_name=DM01 port_num=65237 page_size=32 extent_size=32 log_size=2048 SYSDBA_PWD=DMDBA_hust4400 SYSAUDITOR_PWD=DMDBA_hust4400 使用 normal/open 状态启动单机实例：
+./dmserver data/DM01/dm.ini 如出现以下截图即代表启动成功：
+开启归档 正常安装的时候都会开启归档，所以在这里，我们模拟正常运行过一段时间的单机实例，将归档也打开。
+执行如下命令：
+--开启归档： alter database mount; alter database archivelog; alter database add archivelog &#39;TYPE=LOCAL,DEST=/data/DM01/arch,FILE_SIZE=2048,SPACE_LIMIT=102400&#39;; alter database open; 启动 jmeter 使一个 insert 语句循环执行，用来判断搭建主备的时候，单机数据库是否正常对外服务，可以正常连接、正常执行 SQL。
+先创建表结构：
+CREATE TABLE TEST_LG ( A1 INT, A2 VARCHAR(255), A3 CLOB ); 建立 jmeter 的 workflow，如图下所示：
+"
+  />
+  <meta
+    name="description"
+    content="目前版本（2025 年第一季度版本 - 8.1.4.80）已经支持单机在线转变为主备集群。
+端口规划 主库的实例名为 DM01，备库的实例名为 DM02。
+实例名 MAL_HOST PORT_NUM MAL_INST_DW_PORT MAL_PORT MAL_DW_PORT DM01 10.76.11.205 65237 65337 65437 65537 DM02 10.76.11.205 65238 65338 65438 65538 安装单机 初始化单机实例：
+./dminit path=data instance_name=DM01 db_name=DM01 port_num=65237 page_size=32 extent_size=32 log_size=2048 SYSDBA_PWD=DMDBA_hust4400 SYSAUDITOR_PWD=DMDBA_hust4400 使用 normal/open 状态启动单机实例：
+./dmserver data/DM01/dm.ini 如出现以下截图即代表启动成功：
+开启归档 正常安装的时候都会开启归档，所以在这里，我们模拟正常运行过一段时间的单机实例，将归档也打开。
+执行如下命令：
+--开启归档： alter database mount; alter database archivelog; alter database add archivelog &#39;TYPE=LOCAL,DEST=/data/DM01/arch,FILE_SIZE=2048,SPACE_LIMIT=102400&#39;; alter database open; 启动 jmeter 使一个 insert 语句循环执行，用来判断搭建主备的时候，单机数据库是否正常对外服务，可以正常连接、正常执行 SQL。
+先创建表结构：
+CREATE TABLE TEST_LG ( A1 INT, A2 VARCHAR(255), A3 CLOB ); 建立 jmeter 的 workflow，如图下所示：
+"
+  />
+  <meta property="og:locale" content="en-us" /><meta property="og:image" content="" />
+  
+  
+  <style>body{font-family:bree serif,sans-serif;-webkit-font-smoothing:antialiased;margin:0 20px}article{max-width:800px;margin-left:auto;margin-right:auto}a{color:#000;text-decoration:none}a:hover{font-weight:600;text-decoration:underline}.post-ads{margin:50px 0}.markdown-body{font-size:18px;max-width:100%}.markdown-body a{text-decoration:underline;text-decoration-color:#000}.markdown-body blockquote{margin:0;padding:0 1em;color:#57606a;border-left:.25em solid #d0d7de}.markdown-body pre{padding:16px;overflow:auto;border-radius:10px}.markdown-body code{padding:.2em .4em;font-size:85%;background-color:#f6f8fa;border-radius:6px}.markdown-body pre>code{padding:0;font-size:100%;background-color:inherit;border:0}.Chinese .markdown-body{line-height:200%}.site-date-catalog{font-size:2rem}.header-title{font-size:2rem;font-weight:700;margin-top:32px;font-family:bungee shade,sans-serif}.header-title a{text-decoration:none}.header-subtitle{color:#666}.header-items{margin:10px 0}.header-item{margin:0 5px}.header-line{width:100%;border-width:2px;border-color:#482936;border-style:solid none none none}.lang-switch{font-weight:600}#posts-list{min-height:600px}.posts-line{font-size:1.2rem;margin:12px 0}.posts-categories{font-size:.8rem;margin:auto;text-align:center}.posts-category{padding:3px 0;border:#000 2px solid;border-radius:5px}.site-footer{margin-top:50px}.site-footer-item{margin-right:12px}.post-header{margin-bottom:50px}.post-title{font-size:2rem;font-weight:600}.post-tags{display:inline;font-weight:600;padding:2px 5px;margin-right:6px;border:#000 2px solid;border-radius:5px}.post-date{font-weight:800;font-style:italic}.post-author{float:right;font-weight:600}.page-content{min-height:60%}.post-content{margin-bottom:50px}.post-content p{hyphens:auto;line-height:1.8;text-justify:ideographic;margin-bottom:1em}.post-content img{max-width:100%;display:block;margin-right:auto;margin-top:6px}.post-content .post-gallery{display:flex;flex-wrap:wrap;gap:6px}.post-content .post-gallery img{margin-right:auto;margin-top:auto;width:calc(50% - 3px)}.related-content{border-width:3px;border-style:solid;border-color:#000;padding:0 10px;margin-bottom:50px;margin-top:100px}.related-content li{margin:5px 0}.taxonomy-term{font-size:3rem}.gallery-img{text-align:center}.gallery-img span{text-align:center}.gallery-img-desc{font-size:.8em;font-weight:800}#disqus_thread{position:relative}#disqus_thread:after{content:"";display:block;height:55px;width:100%;position:absolute;bottom:0;background:#fff}@media screen and (max-width:600px){.header-title,.header-subtitle,.header-items{}.posts-line{font-size:16px}.markdown-body{font-size:16px}.post-title{font-size:2rem}.post-content p{letter-spacing:.05em}.post-content .post-gallery img{width:100%}}@media screen and (max-width:48em){.posts-category{display:none}}</style>
+  
+  
+  <style>.container,.container-fluid{margin-right:auto;margin-left:auto}.container-fluid{padding-right:2rem;padding-left:2rem}.row{box-sizing:border-box;display:-webkit-box;display:-ms-flexbox;display:flex;-webkit-box-flex:0;-ms-flex:0 1 auto;flex:initial;-webkit-box-orient:horizontal;-webkit-box-direction:normal;-ms-flex-direction:row;flex-direction:row;-ms-flex-wrap:wrap;flex-wrap:wrap;margin-right:-.5rem;margin-left:-.5rem}.row.reverse{-webkit-box-orient:horizontal;-webkit-box-direction:reverse;-ms-flex-direction:row-reverse;flex-direction:row-reverse}.col.reverse{-webkit-box-orient:vertical;-webkit-box-direction:reverse;-ms-flex-direction:column-reverse;flex-direction:column-reverse}.col-xs,.col-xs-1,.col-xs-10,.col-xs-11,.col-xs-12,.col-xs-2,.col-xs-3,.col-xs-4,.col-xs-5,.col-xs-6,.col-xs-7,.col-xs-8,.col-xs-9,.col-xs-offset-0,.col-xs-offset-1,.col-xs-offset-10,.col-xs-offset-11,.col-xs-offset-12,.col-xs-offset-2,.col-xs-offset-3,.col-xs-offset-4,.col-xs-offset-5,.col-xs-offset-6,.col-xs-offset-7,.col-xs-offset-8,.col-xs-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-xs{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-xs-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-xs-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-xs-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-xs-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-xs-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-xs-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-xs-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-xs-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-xs-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-xs-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-xs-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-xs-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-xs-offset-0{margin-left:0}.col-xs-offset-1{margin-left:8.33333333%}.col-xs-offset-2{margin-left:16.66666667%}.col-xs-offset-3{margin-left:25%}.col-xs-offset-4{margin-left:33.33333333%}.col-xs-offset-5{margin-left:41.66666667%}.col-xs-offset-6{margin-left:50%}.col-xs-offset-7{margin-left:58.33333333%}.col-xs-offset-8{margin-left:66.66666667%}.col-xs-offset-9{margin-left:75%}.col-xs-offset-10{margin-left:83.33333333%}.col-xs-offset-11{margin-left:91.66666667%}.start-xs{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-xs{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-xs{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-xs{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-xs{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-xs{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-xs{-ms-flex-pack:distribute;justify-content:space-around}.between-xs{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-xs{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-xs{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}@media only screen and (min-width:48em){.container{width:49rem}.col-sm,.col-sm-1,.col-sm-10,.col-sm-11,.col-sm-12,.col-sm-2,.col-sm-3,.col-sm-4,.col-sm-5,.col-sm-6,.col-sm-7,.col-sm-8,.col-sm-9,.col-sm-offset-0,.col-sm-offset-1,.col-sm-offset-10,.col-sm-offset-11,.col-sm-offset-12,.col-sm-offset-2,.col-sm-offset-3,.col-sm-offset-4,.col-sm-offset-5,.col-sm-offset-6,.col-sm-offset-7,.col-sm-offset-8,.col-sm-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-sm{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-sm-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-sm-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-sm-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-sm-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-sm-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-sm-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-sm-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-sm-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-sm-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-sm-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-sm-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-sm-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-sm-offset-0{margin-left:0}.col-sm-offset-1{margin-left:8.33333333%}.col-sm-offset-2{margin-left:16.66666667%}.col-sm-offset-3{margin-left:25%}.col-sm-offset-4{margin-left:33.33333333%}.col-sm-offset-5{margin-left:41.66666667%}.col-sm-offset-6{margin-left:50%}.col-sm-offset-7{margin-left:58.33333333%}.col-sm-offset-8{margin-left:66.66666667%}.col-sm-offset-9{margin-left:75%}.col-sm-offset-10{margin-left:83.33333333%}.col-sm-offset-11{margin-left:91.66666667%}.start-sm{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-sm{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-sm{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-sm{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-sm{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-sm{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-sm{-ms-flex-pack:distribute;justify-content:space-around}.between-sm{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-sm{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-sm{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}}@media only screen and (min-width:64em){.container{width:65rem}.col-md,.col-md-1,.col-md-10,.col-md-11,.col-md-12,.col-md-2,.col-md-3,.col-md-4,.col-md-5,.col-md-6,.col-md-7,.col-md-8,.col-md-9,.col-md-offset-0,.col-md-offset-1,.col-md-offset-10,.col-md-offset-11,.col-md-offset-12,.col-md-offset-2,.col-md-offset-3,.col-md-offset-4,.col-md-offset-5,.col-md-offset-6,.col-md-offset-7,.col-md-offset-8,.col-md-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-md{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-md-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-md-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-md-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-md-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-md-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-md-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-md-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-md-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-md-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-md-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-md-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-md-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-md-offset-0{margin-left:0}.col-md-offset-1{margin-left:8.33333333%}.col-md-offset-2{margin-left:16.66666667%}.col-md-offset-3{margin-left:25%}.col-md-offset-4{margin-left:33.33333333%}.col-md-offset-5{margin-left:41.66666667%}.col-md-offset-6{margin-left:50%}.col-md-offset-7{margin-left:58.33333333%}.col-md-offset-8{margin-left:66.66666667%}.col-md-offset-9{margin-left:75%}.col-md-offset-10{margin-left:83.33333333%}.col-md-offset-11{margin-left:91.66666667%}.start-md{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-md{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-md{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-md{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-md{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-md{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-md{-ms-flex-pack:distribute;justify-content:space-around}.between-md{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-md{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-md{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}}@media only screen and (min-width:75em){.container{width:76rem}.col-lg,.col-lg-1,.col-lg-10,.col-lg-11,.col-lg-12,.col-lg-2,.col-lg-3,.col-lg-4,.col-lg-5,.col-lg-6,.col-lg-7,.col-lg-8,.col-lg-9,.col-lg-offset-0,.col-lg-offset-1,.col-lg-offset-10,.col-lg-offset-11,.col-lg-offset-12,.col-lg-offset-2,.col-lg-offset-3,.col-lg-offset-4,.col-lg-offset-5,.col-lg-offset-6,.col-lg-offset-7,.col-lg-offset-8,.col-lg-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-lg{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-lg-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-lg-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-lg-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-lg-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-lg-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-lg-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-lg-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-lg-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-lg-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-lg-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-lg-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-lg-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-lg-offset-0{margin-left:0}.col-lg-offset-1{margin-left:8.33333333%}.col-lg-offset-2{margin-left:16.66666667%}.col-lg-offset-3{margin-left:25%}.col-lg-offset-4{margin-left:33.33333333%}.col-lg-offset-5{margin-left:41.66666667%}.col-lg-offset-6{margin-left:50%}.col-lg-offset-7{margin-left:58.33333333%}.col-lg-offset-8{margin-left:66.66666667%}.col-lg-offset-9{margin-left:75%}.col-lg-offset-10{margin-left:83.33333333%}.col-lg-offset-11{margin-left:91.66666667%}.start-lg{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-lg{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-lg{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-lg{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-lg{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-lg{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-lg{-ms-flex-pack:distribute;justify-content:space-around}.between-lg{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-lg{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-lg{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}}</style>
+  
+   <link href="/index.xml" rel="alternate" type="application/rss+xml" title="guangluo&#39;s blog">
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com" />
+  <link
+    href="https://fonts.googleapis.com/css?family=Bree+Serif|Bungee+Shade"
+    rel="stylesheet"
+  />
+  
+  
+
+  
+  
+</head>
+
+
+<body>
+  <article class="post " id="article">
+    <div class="row">
+      <div class="col-xs-12">
+        <div class="site-header">
+          
+<header>
+  <div class="header-title">
+    <a href="/"
+      >Guang Luo</a
+    >
+  </div>
+  <div class="header-subtitle"></div>
+</header>
+<div class="row end-md header-items">
+  
+  <div class="header-item">
+    <a href="https://github.com/guangluo" target="_blank">Github</a>
+  </div>
+  
+</div>
+<div class="row">
+   
+</div>
+<div class="header-line"></div>
+
+        </div>
+        <header class="post-header">
+          <h1 class="post-title">单机在线转换成主备</h1>
+          
+          <div class="row post-desc">
+            <div class="col-xs-6">
+              
+              <time class="post-date" datetime="2025-10-23 17:11:02 CST">
+                23 Oct 2025
+              </time>
+              
+            </div>
+            <div class="col-xs-6">
+              
+            </div>
+          </div>
+          
+        </header>
+
+        <div class="post-content markdown-body">
+          
+          <p>目前版本（2025 年第一季度版本 - 8.1.4.80）已经支持单机在线转变为主备集群。</p>
+<h2 id="端口规划">端口规划</h2>
+<p>主库的实例名为 <code>DM01</code>，备库的实例名为 <code>DM02</code>。</p>
+<table>
+  <thead>
+      <tr>
+          <th>实例名</th>
+          <th>MAL_HOST</th>
+          <th>PORT_NUM</th>
+          <th>MAL_INST_DW_PORT</th>
+          <th>MAL_PORT</th>
+          <th>MAL_DW_PORT</th>
+      </tr>
+  </thead>
+  <tbody>
+      <tr>
+          <td>DM01</td>
+          <td>10.76.11.205</td>
+          <td>65237</td>
+          <td>65337</td>
+          <td>65437</td>
+          <td>65537</td>
+      </tr>
+      <tr>
+          <td>DM02</td>
+          <td>10.76.11.205</td>
+          <td>65238</td>
+          <td>65338</td>
+          <td>65438</td>
+          <td>65538</td>
+      </tr>
+  </tbody>
+</table>
+<h2 id="安装单机">安装单机</h2>
+<p>初始化单机实例：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>./dminit path=data instance_name=DM01 db_name=DM01 port_num=65237 page_size=32 extent_size=32 log_size=2048 SYSDBA_PWD=DMDBA_hust4400 SYSAUDITOR_PWD=DMDBA_hust4400
+</span></span></code></pre></div><p>使用 <code>normal/open</code> 状态启动单机实例：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>./dmserver data/DM01/dm.ini
+</span></span></code></pre></div><p>如出现以下截图即代表启动成功：</p>
+<p><img src="/database/single-machine-online-to-master-slave-01.png" alt="单机实例启动成功"></p>
+<h2 id="开启归档">开启归档</h2>
+<p>正常安装的时候都会开启归档，所以在这里，我们模拟正常运行过一段时间的单机实例，将归档也打开。</p>
+<p>执行如下命令：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-style:italic">--开启归档：
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">alter</span> <span style="font-weight:bold">database</span> mount;
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">alter</span> <span style="font-weight:bold">database</span> archivelog;
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">alter</span> <span style="font-weight:bold">database</span> <span style="font-weight:bold">add</span> archivelog <span style="font-style:italic">&#39;TYPE=LOCAL,DEST=/data/DM01/arch,FILE_SIZE=2048,SPACE_LIMIT=102400&#39;</span>;
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">alter</span> <span style="font-weight:bold">database</span> <span style="font-weight:bold">open</span>;
+</span></span></code></pre></div><h2 id="启动-jmeter">启动 jmeter</h2>
+<p>使一个 insert 语句循环执行，用来判断搭建主备的时候，单机数据库是否正常对外服务，可以正常连接、正常执行 SQL。</p>
+<p>先创建表结构：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">CREATE</span> <span style="font-weight:bold">TABLE</span> TEST_LG ( A1 INT, A2 VARCHAR(255), A3 <span style="font-weight:bold">CLOB</span> );
+</span></span></code></pre></div><p>建立 jmeter 的 workflow，如图下所示：</p>
+<p><img src="/database/single-machine-online-to-master-slave-02.png" alt="jmeter workflow"></p>
+<h2 id="联机备份">联机备份</h2>
+<p>与离线操作相同，在线操作也需要备份还原一个备库。</p>
+<p>联机备份的操作如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span>BACKUP <span style="font-weight:bold">DATABASE</span> <span style="font-weight:bold">FULL</span> BACKUPSET <span style="font-style:italic">&#39;FULL_BAK_20250706&#39;</span> COMPRESSED <span style="font-weight:bold">LEVEL</span> 1 PARALLEL 4;
+</span></span></code></pre></div><h2 id="新建实例并还原">新建实例并还原</h2>
+<p>我们需要还原一个实例作为备库。</p>
+<p>操作如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="font-style:italic">## 先初始化实例</span>
+</span></span><span style="display:flex;"><span>./dminit path=data instance_name=DM02 db_name=DM02 port_num=65238 page_size=32 extent_size=32 log_size=2048 SYSDBA_PWD=DMDBA_hust4400 SYSAUDITOR_PWD=DMDBA_hust4400
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">## 备份还原</span>
+</span></span><span style="display:flex;"><span>./dmrman CTLSTMT=<span style="font-style:italic">&#34;RESTORE DATABASE &#39;/data/DM02/dm.ini&#39; FROM BACKUPSET &#39;/data/DM02/bak/FULL_BAK_20250706&#39;&#34;</span>
+</span></span><span style="display:flex;"><span>./dmrman CTLSTMT=<span style="font-style:italic">&#34;RECOVER DATABASE &#39;/data/DM02/dm.ini&#39; FROM BACKUPSET &#39;/data/DM02/bak/FULL_BAK_20250706&#39;&#34;</span>
+</span></span><span style="display:flex;"><span>./dmrman CTLSTMT=<span style="font-style:italic">&#34;RECOVER DATABASE &#39;/data/DM02/dm.ini&#39; UPDATE DB_MAGIC&#34;</span>
+</span></span></code></pre></div><h2 id="在线添加-dmmal">在线添加 <code>dmmal</code></h2>
+<p>需要将单机实例与备份实例连接起来，就需要在线添加 <code>dmmal</code> 通讯。</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">CALL</span> SF_MAL_INST_ADD_APPLY(<span style="font-style:italic">&#39;MAL_INST&#39;</span>,<span style="font-style:italic">&#39;DM01&#39;</span>,<span style="font-style:italic">&#39;10.76.11.205&#39;</span>,65437,<span style="font-style:italic">&#39;10.76.11.205&#39;</span>,65237,65137,0,65337);
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">CALL</span> SF_MAL_INST_ADD_APPLY(<span style="font-style:italic">&#39;MAL_INST1&#39;</span>,<span style="font-style:italic">&#39;DM02&#39;</span>,<span style="font-style:italic">&#39;10.76.11.205&#39;</span>,65438,<span style="font-style:italic">&#39;10.76.11.205&#39;</span>,65238,65138,0,65338);
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">CALL</span> SP_SET_PARA_VALUE(1,<span style="font-style:italic">&#39;MAL_INI&#39;</span>,1);
+</span></span></code></pre></div><p>出现以下截图则代表操作成功：</p>
+<p><img src="/database/single-machine-online-to-master-slave-03.png" alt="add dmmal setting successfully"></p>
+<h2 id="添加-realtime-归档">添加 <code>REALTIME</code> 归档</h2>
+<p>将 <code>DM01</code> 的归档发送到 <code>DM02</code> 去，需要在 <code>DM01</code> 上配置 <code>DM02</code> 的 <code>REALTIME</code> 归档。
+命令可以在 normal/open 状态下执行。</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">ALTER</span> <span style="font-weight:bold">DATABASE</span> <span style="font-weight:bold">ADD</span> ARCHIVELOG <span style="font-style:italic">&#39;TYPE=REALTIME,DEST=DM02&#39;</span>;
+</span></span></code></pre></div><h2 id="修改新实例的配置文件">修改新实例的配置文件</h2>
+<p>需要修改四个文件。</p>
+<h3 id="dmini">dm.ini</h3>
+<p>修改原来的文件即可。</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-ini" data-lang="ini"><span style="display:flex;"><span>MAL_INI = <span style="font-style:italic">1</span>
+</span></span><span style="display:flex;"><span>ARCH_INI = <span style="font-style:italic">1</span>
+</span></span></code></pre></div><h3 id="dmmalini">dmmal.ini</h3>
+<p>需要在实例目录新建文件，文件内容如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-ini" data-lang="ini"><span style="display:flex;"><span><span style="font-style:italic">#DaMeng Database Mail Configuration file</span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">#this is comments</span>
+</span></span><span style="display:flex;"><span>MAL_CHECK_INTERVAL     = <span style="font-style:italic">30</span>
+</span></span><span style="display:flex;"><span>MAL_COMBIN_BUF_SIZE    = <span style="font-style:italic">0</span>
+</span></span><span style="display:flex;"><span>MAL_SEND_THRESHOLD = <span style="font-style:italic">2048</span>
+</span></span><span style="display:flex;"><span>MAL_CONN_FAIL_INTERVAL = <span style="font-style:italic">10</span>
+</span></span><span style="display:flex;"><span>MAL_LOGIN_TIMEOUT      = <span style="font-style:italic">15</span>
+</span></span><span style="display:flex;"><span>MAL_BUF_SIZE           = <span style="font-style:italic">100</span>
+</span></span><span style="display:flex;"><span>MAL_SYS_BUF_SIZE       = <span style="font-style:italic">0</span>
+</span></span><span style="display:flex;"><span>MAL_VPOOL_SIZE         = <span style="font-style:italic">128</span>
+</span></span><span style="display:flex;"><span>MAL_COMPRESS_LEVEL     = <span style="font-style:italic">0</span>
+</span></span><span style="display:flex;"><span>MAL_TEMP_PATH          =
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">[MAL_INST]</span>
+</span></span><span style="display:flex;"><span>    MAL_INST_NAME    = <span style="font-style:italic">DM01
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_HOST         = 10.76.11.205
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_PORT         = 65437
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_INST_HOST    = 10.76.11.205
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_INST_PORT    = 65237
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_DW_PORT      = 65137
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_LINK_MAGIC   = 0
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_INST_DW_PORT = 65337</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">[MAL_INST1]</span>
+</span></span><span style="display:flex;"><span>    MAL_INST_NAME    = <span style="font-style:italic">DM02
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_HOST         = 10.76.11.205
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_PORT         = 65438
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_INST_HOST    = 10.76.11.205
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_INST_PORT    = 65238
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_DW_PORT      = 65138
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_LINK_MAGIC   = 0
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">    MAL_INST_DW_PORT = 65338</span>
+</span></span></code></pre></div><h3 id="dmarchini">dmarch.ini</h3>
+<p>需要在实例目录新建文件，文件内容如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-ini" data-lang="ini"><span style="display:flex;"><span><span style="font-style:italic">#DaMeng Database Archive Configuration file</span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">#this is comments</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        ARCH_WAIT_APPLY      = <span style="font-style:italic">0</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">[ARCHIVE_LOCAL1]</span>
+</span></span><span style="display:flex;"><span>        ARCH_TYPE            = <span style="font-style:italic">LOCAL
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">        ARCH_DEST            = /data/hbtest/lg/bin_4_80/data/DM02/arch
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">        ARCH_FILE_SIZE       = 2048
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">        ARCH_SPACE_LIMIT     = 102400
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">        ARCH_FLUSH_BUF_SIZE  = 2
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic">        ARCH_HANG_FLAG       = 1</span>
+</span></span></code></pre></div><h3 id="dmwatcherini">dmwatcher.ini</h3>
+<p>需要在实例目录新建文件，文件内容如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-ini" data-lang="ini"><span style="display:flex;"><span><span style="font-weight:bold">[DM01]</span>
+</span></span><span style="display:flex;"><span>DW_TYPE = <span style="font-style:italic">GLOBAL</span>
+</span></span><span style="display:flex;"><span>DW_MODE = <span style="font-style:italic">AUTO</span>
+</span></span><span style="display:flex;"><span>DW_ERROR_TIME = <span style="font-style:italic">10</span>
+</span></span><span style="display:flex;"><span>INST_RECOVER_TIME = <span style="font-style:italic">60</span>
+</span></span><span style="display:flex;"><span>INST_ERROR_TIME = <span style="font-style:italic">10</span>
+</span></span><span style="display:flex;"><span>INST_OGUID = <span style="font-style:italic">20250708</span>
+</span></span><span style="display:flex;"><span>INST_INI = <span style="font-style:italic">/data/hbtest/lg/bin_4_80/data/DM02/dm.ini</span>
+</span></span><span style="display:flex;"><span>INST_AUTO_RESTART = <span style="font-style:italic">1</span>
+</span></span><span style="display:flex;"><span>INST_STARTUP_CMD = <span style="font-style:italic">/data/hbtest/lg/bin_4_80/dmserver</span>
+</span></span><span style="display:flex;"><span>RLOG_SEND_THRESHOLD = <span style="font-style:italic">0</span>
+</span></span><span style="display:flex;"><span>RLOG_APPLY_THRESHOLD = <span style="font-style:italic">0</span>
+</span></span></code></pre></div><h2 id="使用-mount-状态启动新实例">使用 <code>mount</code> 状态启动新实例</h2>
+<p>命令如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>./dmserver /data/hbtest/lg/bin_4_80/data/DM02/dm.ini mount
+</span></span></code></pre></div><h2 id="修改新实例-oguid-以及数据库状态">修改新实例 <code>oguid</code> 以及数据库状态</h2>
+<p>命令如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="font-style:italic">## 登录实例</span>
+</span></span><span style="display:flex;"><span>./disql SYSDBA/DMDBA_hust4400@127.0.0.1:65238
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">## 修改 oguid, 数据库状态</span>
+</span></span><span style="display:flex;"><span>alter database standby;
+</span></span><span style="display:flex;"><span>sp_set_oguid(20250708);
+</span></span></code></pre></div><h2 id="旧实例新增-dmwatcher">旧实例新增 <code>dmwatcher</code></h2>
+<p>在旧实例的实例目录中创建 <code>dmwatcher.ini</code> 文件，文件内容如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-ini" data-lang="ini"><span style="display:flex;"><span><span style="font-weight:bold">[DM01]</span>
+</span></span><span style="display:flex;"><span>DW_TYPE = <span style="font-style:italic">GLOBAL</span>
+</span></span><span style="display:flex;"><span>DW_MODE = <span style="font-style:italic">AUTO</span>
+</span></span><span style="display:flex;"><span>DW_ERROR_TIME = <span style="font-style:italic">10</span>
+</span></span><span style="display:flex;"><span>INST_RECOVER_TIME = <span style="font-style:italic">60</span>
+</span></span><span style="display:flex;"><span>INST_ERROR_TIME = <span style="font-style:italic">10</span>
+</span></span><span style="display:flex;"><span>INST_OGUID = <span style="font-style:italic">20250708</span>
+</span></span><span style="display:flex;"><span>INST_INI = <span style="font-style:italic">/data/hbtest/lg/bin_4_80/data/DM02/dm.ini</span>
+</span></span><span style="display:flex;"><span>INST_AUTO_RESTART = <span style="font-style:italic">1</span>
+</span></span><span style="display:flex;"><span>INST_STARTUP_CMD = <span style="font-style:italic">/data/hbtest/lg/bin_4_80/dmserver</span>
+</span></span><span style="display:flex;"><span>RLOG_SEND_THRESHOLD = <span style="font-style:italic">0</span>
+</span></span><span style="display:flex;"><span>RLOG_APPLY_THRESHOLD = <span style="font-style:italic">0</span>
+</span></span></code></pre></div><h2 id="修改旧实例的-oguid-以及数据库状态">修改旧实例的 <code>oguid</code> 以及数据库状态</h2>
+<p>命令如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">alter</span> <span style="font-weight:bold">database</span> <span style="font-weight:bold">primary</span> <span style="font-weight:bold">force</span>;
+</span></span><span style="display:flex;"><span>sp_set_oguid(20250708);
+</span></span></code></pre></div><h2 id="启动新旧实例的-dmwatcher">启动新旧实例的 <code>dmwatcher</code></h2>
+<p>命令如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>./dmwatcher /data/hbtest/lg/bin_4_80/data/DM01/dmwatcher.ini
+</span></span><span style="display:flex;"><span>./dmwatcher /data/hbtest/lg/bin_4_80/data/DM02/dmwatcher.ini
+</span></span></code></pre></div><h2 id="查看-dmmonitor">查看 <code>dmmonitor</code></h2>
+<p>见到如下截图，则代表搭建成功。</p>
+<p><img src="/database/single-machine-online-to-master-slave-04.png" alt="dmmonitor"></p>
+
+        </div>
+
+        <div class="row middle-xs">
+          <div class="col-xs-12">
+            
+          </div>
+        </div>
+        
+          <div class="row">
+            <div class="col-xs-12">
+              
+            </div>
+          </div>
+
+          
+
+
+
+          
+          
+          <div style="height: 50px;"></div>
+          
+        
+
+        <div class="site-footer">
+  
+  
+</div>
+
+      </div>
+    </div>
+  </article>
+
+  
+<script>
+  
+  document.addEventListener("DOMContentLoaded", function() {
+    const disqus = document.getElementById('disqus_thread');
+    if (!disqus) {
+      return;
+    }
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        const iframes = disqus.getElementsByTagName('iframe');
+        if (iframes.length > 1) {
+          const commentsIframe = iframes[1];
+          while (disqus.firstChild) {
+            disqus.removeChild(disqus.firstChild);
+          }
+          disqus.appendChild(commentsIframe);
+          observer.disconnect();
+        }
+      });
+    });
+    observer.observe(disqus, { childList: true, subtree: true });
+  });
+</script>
+
+  
+
+</body>
+
+</html>

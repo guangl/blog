@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <meta charset="utf-8" />
+  <meta name="generator" content="Hugo 0.151.2">
+
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="author" content="" />
+  <meta property="og:url" content="http://localhost:1313/posts/dm-thread/" />
+  <link rel="canonical" href="http://localhost:1313/posts/dm-thread/" /><link
+    rel="alternate"
+    type="application/atom+xml"
+    href="http://localhost:1313/index.xml"
+    title="guangluo&#39;s blog"
+  />
+
+  <script type="application/ld+json">
+  {
+      "@context" : "http://schema.org",
+      "@type" : "BlogPosting",
+      "mainEntityOfPage": {
+           "@type": "WebPage",
+           "@id": "http:\/\/localhost:1313\/"
+      },
+      "articleSection" : "posts",
+      "name" : "达梦数据库单机线程",
+      "headline" : "达梦数据库单机线程",
+      "description" : "DM 在启动时会创建所有的线程。线程类型如下：\ndm_dpc_pthd dm_sqllog_thd dm_audit_thd dm_rsyswrk_thd dm_io_thd dm_hio_thd dm_wrkgrp_thd dm_purge_thd dm_sql_thd dm_sql_aux_thd dm_tskwrk_thd dm_trctsk_thd dm_redolog_thd dm_lsnr_thd dm_sched_thd dm_chkpnt_thd dm_quit_thd 此类型为单机所拥有，集群以后在下补充。\ndm_dpc_pthd DPC 的工作线程，但是不知道为什么单机也会出现，应该是数据库架构问题。\n创建此线程的堆栈如下：\n#0 0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from \/lib64\/libpthread.so #1 0x0000000000703cbc in os_event2_wait () #2 0x0000000001c68fcd in uevent_wait () #3 0x00000000025c782e in pthd_worker_thread () #4 0x00007ffff79ae1da in start_thread () from \/lib64\/libpthread.so #5 0x00007ffff6cffe73 in clone () from \/lib64\/libc.so dm_sqllog_thd flush sqllog 的线程，但是并没有打开 SVR_LOG，一样出现了此线程，说明数据库架构有问题。\n创建此线程的堆栈如下：\n#0 0x00007ffff79b4898 in pthread_cond_timedwait@@GLIBC_2.3.2 () from \/lib64\/libpthread.so #1 0x0000000000703bcf in os_event2_wait_timeout () #2 0x0000000001e07c45 in slog_flush_thread () #3 0x00007ffff79ae1da in start_thread () from \/lib64\/libpthread.so #4 0x00007ffff6cffe73 in clone () from \/lib64\/libc.so dm_audit_thd flush audit log（审计）的线程，但是并没有打开审计功能，一样出现了此线程，说明数据库架构有问题。\n",
+      "inLanguage" : "en-US",
+      "author" : "",
+      "creator" : "",
+      "publisher": "",
+      "accountablePerson" : "",
+      "copyrightHolder" : "",
+      "copyrightYear" : "2025",
+      "datePublished": "2025-10-23 17:01:12 \u002b0800 CST",
+      "dateModified" : "2025-10-23 17:01:12 \u002b0800 CST",
+      "url" : "http:\/\/localhost:1313\/posts\/dm-thread\/",
+      "keywords" : [  ]
+  }
+</script>
+<title>达梦数据库单机线程</title>
+  <meta property="og:title" content="达梦数据库单机线程" />
+  <meta property="og:type" content="article" />
+  <meta
+    property="og:description"
+    content="DM 在启动时会创建所有的线程。线程类型如下：
+dm_dpc_pthd dm_sqllog_thd dm_audit_thd dm_rsyswrk_thd dm_io_thd dm_hio_thd dm_wrkgrp_thd dm_purge_thd dm_sql_thd dm_sql_aux_thd dm_tskwrk_thd dm_trctsk_thd dm_redolog_thd dm_lsnr_thd dm_sched_thd dm_chkpnt_thd dm_quit_thd 此类型为单机所拥有，集群以后在下补充。
+dm_dpc_pthd DPC 的工作线程，但是不知道为什么单机也会出现，应该是数据库架构问题。
+创建此线程的堆栈如下：
+#0 0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so #1 0x0000000000703cbc in os_event2_wait () #2 0x0000000001c68fcd in uevent_wait () #3 0x00000000025c782e in pthd_worker_thread () #4 0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so #5 0x00007ffff6cffe73 in clone () from /lib64/libc.so dm_sqllog_thd flush sqllog 的线程，但是并没有打开 SVR_LOG，一样出现了此线程，说明数据库架构有问题。
+创建此线程的堆栈如下：
+#0 0x00007ffff79b4898 in pthread_cond_timedwait@@GLIBC_2.3.2 () from /lib64/libpthread.so #1 0x0000000000703bcf in os_event2_wait_timeout () #2 0x0000000001e07c45 in slog_flush_thread () #3 0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so #4 0x00007ffff6cffe73 in clone () from /lib64/libc.so dm_audit_thd flush audit log（审计）的线程，但是并没有打开审计功能，一样出现了此线程，说明数据库架构有问题。
+"
+  />
+  <meta
+    name="description"
+    content="DM 在启动时会创建所有的线程。线程类型如下：
+dm_dpc_pthd dm_sqllog_thd dm_audit_thd dm_rsyswrk_thd dm_io_thd dm_hio_thd dm_wrkgrp_thd dm_purge_thd dm_sql_thd dm_sql_aux_thd dm_tskwrk_thd dm_trctsk_thd dm_redolog_thd dm_lsnr_thd dm_sched_thd dm_chkpnt_thd dm_quit_thd 此类型为单机所拥有，集群以后在下补充。
+dm_dpc_pthd DPC 的工作线程，但是不知道为什么单机也会出现，应该是数据库架构问题。
+创建此线程的堆栈如下：
+#0 0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so #1 0x0000000000703cbc in os_event2_wait () #2 0x0000000001c68fcd in uevent_wait () #3 0x00000000025c782e in pthd_worker_thread () #4 0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so #5 0x00007ffff6cffe73 in clone () from /lib64/libc.so dm_sqllog_thd flush sqllog 的线程，但是并没有打开 SVR_LOG，一样出现了此线程，说明数据库架构有问题。
+创建此线程的堆栈如下：
+#0 0x00007ffff79b4898 in pthread_cond_timedwait@@GLIBC_2.3.2 () from /lib64/libpthread.so #1 0x0000000000703bcf in os_event2_wait_timeout () #2 0x0000000001e07c45 in slog_flush_thread () #3 0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so #4 0x00007ffff6cffe73 in clone () from /lib64/libc.so dm_audit_thd flush audit log（审计）的线程，但是并没有打开审计功能，一样出现了此线程，说明数据库架构有问题。
+"
+  />
+  <meta property="og:locale" content="en-us" /><meta property="og:image" content="" />
+  
+  
+  <style>body{font-family:bree serif,sans-serif;-webkit-font-smoothing:antialiased;margin:0 20px}article{max-width:800px;margin-left:auto;margin-right:auto}a{color:#000;text-decoration:none}a:hover{font-weight:600;text-decoration:underline}.post-ads{margin:50px 0}.markdown-body{font-size:18px;max-width:100%}.markdown-body a{text-decoration:underline;text-decoration-color:#000}.markdown-body blockquote{margin:0;padding:0 1em;color:#57606a;border-left:.25em solid #d0d7de}.markdown-body pre{padding:16px;overflow:auto;border-radius:10px}.markdown-body code{padding:.2em .4em;font-size:85%;background-color:#f6f8fa;border-radius:6px}.markdown-body pre>code{padding:0;font-size:100%;background-color:inherit;border:0}.Chinese .markdown-body{line-height:200%}.site-date-catalog{font-size:2rem}.header-title{font-size:2rem;font-weight:700;margin-top:32px;font-family:bungee shade,sans-serif}.header-title a{text-decoration:none}.header-subtitle{color:#666}.header-items{margin:10px 0}.header-item{margin:0 5px}.header-line{width:100%;border-width:2px;border-color:#482936;border-style:solid none none none}.lang-switch{font-weight:600}#posts-list{min-height:600px}.posts-line{font-size:1.2rem;margin:12px 0}.posts-categories{font-size:.8rem;margin:auto;text-align:center}.posts-category{padding:3px 0;border:#000 2px solid;border-radius:5px}.site-footer{margin-top:50px}.site-footer-item{margin-right:12px}.post-header{margin-bottom:50px}.post-title{font-size:2rem;font-weight:600}.post-tags{display:inline;font-weight:600;padding:2px 5px;margin-right:6px;border:#000 2px solid;border-radius:5px}.post-date{font-weight:800;font-style:italic}.post-author{float:right;font-weight:600}.page-content{min-height:60%}.post-content{margin-bottom:50px}.post-content p{hyphens:auto;line-height:1.8;text-justify:ideographic;margin-bottom:1em}.post-content img{max-width:100%;display:block;margin-right:auto;margin-top:6px}.post-content .post-gallery{display:flex;flex-wrap:wrap;gap:6px}.post-content .post-gallery img{margin-right:auto;margin-top:auto;width:calc(50% - 3px)}.related-content{border-width:3px;border-style:solid;border-color:#000;padding:0 10px;margin-bottom:50px;margin-top:100px}.related-content li{margin:5px 0}.taxonomy-term{font-size:3rem}.gallery-img{text-align:center}.gallery-img span{text-align:center}.gallery-img-desc{font-size:.8em;font-weight:800}#disqus_thread{position:relative}#disqus_thread:after{content:"";display:block;height:55px;width:100%;position:absolute;bottom:0;background:#fff}@media screen and (max-width:600px){.header-title,.header-subtitle,.header-items{}.posts-line{font-size:16px}.markdown-body{font-size:16px}.post-title{font-size:2rem}.post-content p{letter-spacing:.05em}.post-content .post-gallery img{width:100%}}@media screen and (max-width:48em){.posts-category{display:none}}</style>
+  
+  
+  <style>.container,.container-fluid{margin-right:auto;margin-left:auto}.container-fluid{padding-right:2rem;padding-left:2rem}.row{box-sizing:border-box;display:-webkit-box;display:-ms-flexbox;display:flex;-webkit-box-flex:0;-ms-flex:0 1 auto;flex:initial;-webkit-box-orient:horizontal;-webkit-box-direction:normal;-ms-flex-direction:row;flex-direction:row;-ms-flex-wrap:wrap;flex-wrap:wrap;margin-right:-.5rem;margin-left:-.5rem}.row.reverse{-webkit-box-orient:horizontal;-webkit-box-direction:reverse;-ms-flex-direction:row-reverse;flex-direction:row-reverse}.col.reverse{-webkit-box-orient:vertical;-webkit-box-direction:reverse;-ms-flex-direction:column-reverse;flex-direction:column-reverse}.col-xs,.col-xs-1,.col-xs-10,.col-xs-11,.col-xs-12,.col-xs-2,.col-xs-3,.col-xs-4,.col-xs-5,.col-xs-6,.col-xs-7,.col-xs-8,.col-xs-9,.col-xs-offset-0,.col-xs-offset-1,.col-xs-offset-10,.col-xs-offset-11,.col-xs-offset-12,.col-xs-offset-2,.col-xs-offset-3,.col-xs-offset-4,.col-xs-offset-5,.col-xs-offset-6,.col-xs-offset-7,.col-xs-offset-8,.col-xs-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-xs{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-xs-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-xs-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-xs-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-xs-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-xs-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-xs-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-xs-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-xs-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-xs-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-xs-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-xs-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-xs-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-xs-offset-0{margin-left:0}.col-xs-offset-1{margin-left:8.33333333%}.col-xs-offset-2{margin-left:16.66666667%}.col-xs-offset-3{margin-left:25%}.col-xs-offset-4{margin-left:33.33333333%}.col-xs-offset-5{margin-left:41.66666667%}.col-xs-offset-6{margin-left:50%}.col-xs-offset-7{margin-left:58.33333333%}.col-xs-offset-8{margin-left:66.66666667%}.col-xs-offset-9{margin-left:75%}.col-xs-offset-10{margin-left:83.33333333%}.col-xs-offset-11{margin-left:91.66666667%}.start-xs{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-xs{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-xs{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-xs{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-xs{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-xs{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-xs{-ms-flex-pack:distribute;justify-content:space-around}.between-xs{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-xs{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-xs{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}@media only screen and (min-width:48em){.container{width:49rem}.col-sm,.col-sm-1,.col-sm-10,.col-sm-11,.col-sm-12,.col-sm-2,.col-sm-3,.col-sm-4,.col-sm-5,.col-sm-6,.col-sm-7,.col-sm-8,.col-sm-9,.col-sm-offset-0,.col-sm-offset-1,.col-sm-offset-10,.col-sm-offset-11,.col-sm-offset-12,.col-sm-offset-2,.col-sm-offset-3,.col-sm-offset-4,.col-sm-offset-5,.col-sm-offset-6,.col-sm-offset-7,.col-sm-offset-8,.col-sm-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-sm{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-sm-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-sm-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-sm-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-sm-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-sm-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-sm-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-sm-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-sm-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-sm-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-sm-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-sm-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-sm-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-sm-offset-0{margin-left:0}.col-sm-offset-1{margin-left:8.33333333%}.col-sm-offset-2{margin-left:16.66666667%}.col-sm-offset-3{margin-left:25%}.col-sm-offset-4{margin-left:33.33333333%}.col-sm-offset-5{margin-left:41.66666667%}.col-sm-offset-6{margin-left:50%}.col-sm-offset-7{margin-left:58.33333333%}.col-sm-offset-8{margin-left:66.66666667%}.col-sm-offset-9{margin-left:75%}.col-sm-offset-10{margin-left:83.33333333%}.col-sm-offset-11{margin-left:91.66666667%}.start-sm{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-sm{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-sm{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-sm{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-sm{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-sm{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-sm{-ms-flex-pack:distribute;justify-content:space-around}.between-sm{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-sm{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-sm{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}}@media only screen and (min-width:64em){.container{width:65rem}.col-md,.col-md-1,.col-md-10,.col-md-11,.col-md-12,.col-md-2,.col-md-3,.col-md-4,.col-md-5,.col-md-6,.col-md-7,.col-md-8,.col-md-9,.col-md-offset-0,.col-md-offset-1,.col-md-offset-10,.col-md-offset-11,.col-md-offset-12,.col-md-offset-2,.col-md-offset-3,.col-md-offset-4,.col-md-offset-5,.col-md-offset-6,.col-md-offset-7,.col-md-offset-8,.col-md-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-md{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-md-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-md-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-md-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-md-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-md-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-md-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-md-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-md-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-md-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-md-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-md-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-md-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-md-offset-0{margin-left:0}.col-md-offset-1{margin-left:8.33333333%}.col-md-offset-2{margin-left:16.66666667%}.col-md-offset-3{margin-left:25%}.col-md-offset-4{margin-left:33.33333333%}.col-md-offset-5{margin-left:41.66666667%}.col-md-offset-6{margin-left:50%}.col-md-offset-7{margin-left:58.33333333%}.col-md-offset-8{margin-left:66.66666667%}.col-md-offset-9{margin-left:75%}.col-md-offset-10{margin-left:83.33333333%}.col-md-offset-11{margin-left:91.66666667%}.start-md{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-md{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-md{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-md{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-md{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-md{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-md{-ms-flex-pack:distribute;justify-content:space-around}.between-md{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-md{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-md{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}}@media only screen and (min-width:75em){.container{width:76rem}.col-lg,.col-lg-1,.col-lg-10,.col-lg-11,.col-lg-12,.col-lg-2,.col-lg-3,.col-lg-4,.col-lg-5,.col-lg-6,.col-lg-7,.col-lg-8,.col-lg-9,.col-lg-offset-0,.col-lg-offset-1,.col-lg-offset-10,.col-lg-offset-11,.col-lg-offset-12,.col-lg-offset-2,.col-lg-offset-3,.col-lg-offset-4,.col-lg-offset-5,.col-lg-offset-6,.col-lg-offset-7,.col-lg-offset-8,.col-lg-offset-9{box-sizing:border-box;-webkit-box-flex:0;-ms-flex:0 0 auto;flex:none;padding-right:.5rem;padding-left:.5rem}.col-lg{-webkit-box-flex:1;-ms-flex-positive:1;flex-grow:1;-ms-flex-preferred-size:0;flex-basis:0;max-width:100%}.col-lg-1{-ms-flex-preferred-size:8.33333333%;flex-basis:8.33333333%;max-width:8.33333333%}.col-lg-2{-ms-flex-preferred-size:16.66666667%;flex-basis:16.66666667%;max-width:16.66666667%}.col-lg-3{-ms-flex-preferred-size:25%;flex-basis:25%;max-width:25%}.col-lg-4{-ms-flex-preferred-size:33.33333333%;flex-basis:33.33333333%;max-width:33.33333333%}.col-lg-5{-ms-flex-preferred-size:41.66666667%;flex-basis:41.66666667%;max-width:41.66666667%}.col-lg-6{-ms-flex-preferred-size:50%;flex-basis:50%;max-width:50%}.col-lg-7{-ms-flex-preferred-size:58.33333333%;flex-basis:58.33333333%;max-width:58.33333333%}.col-lg-8{-ms-flex-preferred-size:66.66666667%;flex-basis:66.66666667%;max-width:66.66666667%}.col-lg-9{-ms-flex-preferred-size:75%;flex-basis:75%;max-width:75%}.col-lg-10{-ms-flex-preferred-size:83.33333333%;flex-basis:83.33333333%;max-width:83.33333333%}.col-lg-11{-ms-flex-preferred-size:91.66666667%;flex-basis:91.66666667%;max-width:91.66666667%}.col-lg-12{-ms-flex-preferred-size:100%;flex-basis:100%;max-width:100%}.col-lg-offset-0{margin-left:0}.col-lg-offset-1{margin-left:8.33333333%}.col-lg-offset-2{margin-left:16.66666667%}.col-lg-offset-3{margin-left:25%}.col-lg-offset-4{margin-left:33.33333333%}.col-lg-offset-5{margin-left:41.66666667%}.col-lg-offset-6{margin-left:50%}.col-lg-offset-7{margin-left:58.33333333%}.col-lg-offset-8{margin-left:66.66666667%}.col-lg-offset-9{margin-left:75%}.col-lg-offset-10{margin-left:83.33333333%}.col-lg-offset-11{margin-left:91.66666667%}.start-lg{-webkit-box-pack:start;-ms-flex-pack:start;justify-content:flex-start;text-align:start}.center-lg{-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;text-align:center}.end-lg{-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;text-align:end}.top-lg{-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}.middle-lg{-webkit-box-align:center;-ms-flex-align:center;align-items:center}.bottom-lg{-webkit-box-align:end;-ms-flex-align:end;align-items:flex-end}.around-lg{-ms-flex-pack:distribute;justify-content:space-around}.between-lg{-webkit-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between}.first-lg{-webkit-box-ordinal-group:0;-ms-flex-order:-1;order:-1}.last-lg{-webkit-box-ordinal-group:2;-ms-flex-order:1;order:1}}</style>
+  
+   <link href="/index.xml" rel="alternate" type="application/rss+xml" title="guangluo&#39;s blog">
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com" />
+  <link
+    href="https://fonts.googleapis.com/css?family=Bree+Serif|Bungee+Shade"
+    rel="stylesheet"
+  />
+  
+  
+
+  
+  
+</head>
+
+
+<body>
+  <article class="post " id="article">
+    <div class="row">
+      <div class="col-xs-12">
+        <div class="site-header">
+          
+<header>
+  <div class="header-title">
+    <a href="/"
+      >Guang Luo</a
+    >
+  </div>
+  <div class="header-subtitle"></div>
+</header>
+<div class="row end-md header-items">
+  
+  <div class="header-item">
+    <a href="https://github.com/guangluo" target="_blank">Github</a>
+  </div>
+  
+</div>
+<div class="row">
+   
+</div>
+<div class="header-line"></div>
+
+        </div>
+        <header class="post-header">
+          <h1 class="post-title">达梦数据库单机线程</h1>
+          
+          <div class="row post-desc">
+            <div class="col-xs-6">
+              
+              <time class="post-date" datetime="2025-10-23 17:01:12 CST">
+                23 Oct 2025
+              </time>
+              
+            </div>
+            <div class="col-xs-6">
+              
+            </div>
+          </div>
+          
+        </header>
+
+        <div class="post-content markdown-body">
+          
+          <p>DM 在启动时会创建所有的线程。线程类型如下：</p>
+<ul>
+<li>dm_dpc_pthd</li>
+<li>dm_sqllog_thd</li>
+<li>dm_audit_thd</li>
+<li>dm_rsyswrk_thd</li>
+<li>dm_io_thd</li>
+<li>dm_hio_thd</li>
+<li>dm_wrkgrp_thd</li>
+<li>dm_purge_thd</li>
+<li>dm_sql_thd</li>
+<li>dm_sql_aux_thd</li>
+<li>dm_tskwrk_thd</li>
+<li>dm_trctsk_thd</li>
+<li>dm_redolog_thd</li>
+<li>dm_lsnr_thd</li>
+<li>dm_sched_thd</li>
+<li>dm_chkpnt_thd</li>
+<li>dm_quit_thd</li>
+</ul>
+<p>此类型为单机所拥有，集群以后在下补充。</p>
+<h2 id="dm_dpc_pthd">dm_dpc_pthd</h2>
+<p>DPC 的工作线程，但是不知道为什么单机也会出现，应该是数据库架构问题。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-txt" data-lang="txt"><span style="display:flex;"><span>#0  0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span><span style="display:flex;"><span>#1  0x0000000000703cbc in os_event2_wait ()
+</span></span><span style="display:flex;"><span>#2  0x0000000001c68fcd in uevent_wait ()
+</span></span><span style="display:flex;"><span>#3  0x00000000025c782e in pthd_worker_thread ()
+</span></span><span style="display:flex;"><span>#4  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span><span style="display:flex;"><span>#5  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></code></pre></div><h2 id="dm_sqllog_thd">dm_sqllog_thd</h2>
+<p>flush sqllog 的线程，但是并没有打开 SVR_LOG，一样出现了此线程，说明数据库架构有问题。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b4898 in pthread_cond_timedwait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000703bcf in os_event2_wait_timeout ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000001e07c45 in slog_flush_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_audit_thd">dm_audit_thd</h2>
+<p>flush audit log（审计）的线程，但是并没有打开审计功能，一样出现了此线程，说明数据库架构有问题。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000703cbc in os_event2_wait ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000001c68fcd in uevent_wait ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x0000000001acfb03 in aud_tsk_check ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x0000000001acf84b in aud_flush_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#5  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#6  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_rsyswrk_thd">dm_rsyswrk_thd</h2>
+<p>异步归档线程，主要负责将任务队列中的任务，按照归档类型进行相应的归档处理，一般由日志 flush 线程触发。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000717a62 in os_semaphore_p ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000001b0690c in rtsk_queue_check ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x0000000001b02e5b in rsys_work_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#5  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_io_thd">dm_io_thd</h2>
+<ul>
+<li><code>IO_THR_GROUPS</code> 控制线程数量；</li>
+<li>默认值：8；</li>
+<li>取值范围：1~512；</li>
+</ul>
+<p>通常情况下，DM 需要进行 IO 操作的时机主要有以下三种：</p>
+<ol>
+<li>需要处理的数据页不在缓冲区中，此时需要将相关数据页读入缓冲区；</li>
+<li>缓冲区满或系统关闭时，此时需要将部分脏数据页写入磁盘；</li>
+<li>检查点到来时，需要将所有脏数据页写入磁盘。</li>
+</ol>
+<p>IO 线程在启动后，通常都处于睡眠状态，当系统需要进行 IO 时，只需要发出一个 IO 请求，此时 IO 线程被唤醒以处理该请求，在完成该 IO 操作后继续进入睡眠状态。</p>
+<p>同时，IO 线程处理 IO 的策略根据操作系统平台的不同会有很大差别，一般情况下，IO 线程使用 异步 IO 将数据页写入磁盘，此时，系统将所有的 IO 请求直接递交给操作系统，操作系统在完成这些请求后才通知 IO 线程，这种异步 IO 的方式使得 IO 线程需要直接处理的任务很简单，即完成 IO 后的一些收尾处理并发出 IO 完成通知。</p>
+<blockquote>
+<p>[!NOTE]
+如果操作系统不支持异步 IO，此时 IO 线程就需要完成同步 IO 操作。</p>
+</blockquote>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000717a62 in os_semaphore_p ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x000000000071280a in os_io_thread_sema ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x0000000000712fb4 in os_io_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#5  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_hio_thd">dm_hio_thd</h2>
+<p>读取 HFS 相关的 IO 操作，比如 HUGE 表的读取。</p>
+<ul>
+<li><code>HIO_THR_GROUPS</code> 控制线程数量；</li>
+<li>默认值：2；</li>
+<li>取值范围：1~512；</li>
+</ul>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000717a62 in os_semaphore_p ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000001cab30a in hio_thread_sema ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x0000000001cab926 in hio_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#5  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_wrkgrp_thd">dm_wrkgrp_thd</h2>
+<p>用户工作线程。</p>
+<ul>
+<li><code>WORKER_THREADS</code> 控制线程数量；</li>
+<li>默认值：8；</li>
+<li>取值范围：1~64；</li>
+</ul>
+<p>工作线程是 DM 服务器的核心线程，它从任务队列中取出任务，并根据任务的类型进行相应的处理，负责所有实际的数据相关操作。</p>
+<p>DM8 的初始工作线程个数由配置文件指定，随着会话连接的增加，工作线程也会同步增加，以保持每个会话都有专门的工作线程处理请求。为了保证用户所有请求及时响应，一个会话上的任务全部由同一个工作线程完成，这样减少了线程切换的代价，提高了系统效率。
+当会话连接超过预设的阀值时，工作线程数目不再增加，转而由会话轮询线程接收所有用户请求，加入任务队列，等待工作线程一旦空闲，从任务队列（有歧义，应该是工作线程的任务队列）依次摘取请求任务处理。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff6dea3b1 in poll () from /lib64/libc.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000001c68ab2 in iocp_queue_check ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000001c6aeb6 in uthr_master_for_os ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x0000000001c6af89 in uthr_worker_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#5  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><p>通过堆栈可以看出应该是会创建一个 <code>iocp_queue</code> 的队列。</p>
+<h2 id="dm_purge_thd">dm_purge_thd</h2>
+<p>purge 线程。主要负责回滚段的清理</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b4898 in pthread_cond_timedwait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000703bcf in os_event2_wait_timeout ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000000bfec30 in purg2_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_sql_thd">dm_sql_thd</h2>
+<p>用户会话线程。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff6dea3b1 in poll () from /lib64/libc.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000915d86 in viosocket_poll ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000000cb657f in sess4_msg_recv ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x0000000001c6c1f4 in uthr_db_main_for_sess ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#5  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_sql_aux_thd">dm_sql_aux_thd</h2>
+<p>用户会话辅助线程。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000703cbc in os_event2_wait ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000000cb923e in sess4_aux_tsk_check ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x0000000000cb9509 in sess4_aux_tsk_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#5  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_tskwrk_thd">dm_tskwrk_thd</h2>
+<p>任务工作线程用于 SQL 解析和执行 sevrer 本身。</p>
+<ul>
+<li><code>TASK_THREADS</code> 控制线程数量；</li>
+<li>默认值为 8；</li>
+<li>取值范围：1~1000；</li>
+</ul>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000717a62 in os_semaphore_p ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000001dba790 in ntsk_queue_check ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x0000000001df0d7d in ntsk_worker_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#5  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><p>通过堆栈可以看出应该是会创建一个 <code>ntsk_queue</code> 的队列。</p>
+<h2 id="dm_trctsk_thd">dm_trctsk_thd</h2>
+<p>写入 trace 信息的线程。主要负责数据库告警跟踪信息写入告警日志文件中。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000717a62 in os_semaphore_p ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000001cf9290 in trc_task_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_redolog_thd">dm_redolog_thd</h2>
+<p>redo log 的线程，用于 flush 日志。</p>
+<p>任何对数据库的修改，都会产生重做 redo 日志，为了保证数据恢复的一致性，redo 日志的刷盘必须在数据也刷盘之前进行。事务运行时，会把生成的 redo 日志保留在日志缓冲区中，当事务提交或者执行检查点时，会通知 redo log 线程进行日志刷盘。由于日志具备顺序写入的特点，比数据页分散 IO 写入效率更高。redo log 线程和 IO 线程分开，能获得更快的响应速度，保证整体的性能。
+在刷盘之前，对不同缓冲区内的日志进行合并，减少了 IO 次数，进一步提高了性能。</p>
+<p>如果系统配置了实时归档，在 redo log 线程日志刷盘前，会直接将日志通过网络发送到实时备库。如果配置了本地归档，则生成归档任务，通过日志归档线程完成。</p>
+<blockquote>
+<p>[!NOTE]
+send redo_pkg 的动作是由 dm_redolog_thd 线程完成。</p>
+</blockquote>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b4898 in pthread_cond_timedwait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000703bcf in os_event2_wait_timeout ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x00000000007bcff6 in rlog4_flush_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_lsnr_thd">dm_lsnr_thd</h2>
+<p>服务监听线程。</p>
+<p>监听线程主要的任务是在服务器端口上进行循环监听，一旦有来自客户的连接请求，监听线程被唤醒并生成一个会话申请任务，加入工作线程的任务队列 <code>iocp_queue</code>，等待工作线程进行处理。
+它在系统启动完成后才启动，并且在系统关闭时首先被关闭。为了保证在处理大量客户连接时系统具有较短的响应时间，监听线程比普通线程优先级更高。</p>
+<p>DM 服务器所有配置端口的范围为 1024-65534。当客户端工具发起连接时，由操作系统为客户端工具自动分配一个端口用于与 DM 服务器进行通信。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff6decaef in select () from /lib64/libc.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000001d96a7a in nsvr_lsnr_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_sched_thd">dm_sched_thd</h2>
+<p>服务器调度线程，用于触发后台检查点、与时间相关的触发器。</p>
+<p>调度线程用于接管系统中所有需要定时调度的任务。调度线程每秒钟轮询一次，负责的任务有以下一些：</p>
+<ol>
+<li>检查系统级的时间触发器，如果满足触发条件则生成任务加到工作线程的任务队列由工作线程执行；</li>
+<li>清理 SQL 缓存、计划缓存中失效的项，或者超出缓存限制后淘汰不常用的缓存项；</li>
+<li>执行动态缓冲区检查。根据需要动态扩展或动态收缩系统缓冲池；</li>
+<li>自动执行检查点。为了保证日志的及时刷盘，减少系统故障时恢复时间，根据 INI 参数设置的自动检查点执行间隔定期执行检查点操作；</li>
+<li>会话超时检测。当客户连接设置了连接超时时，定期检测是否超时，如果超时则自动断开连接；</li>
+<li>必要时执行数据更新页刷盘；</li>
+<li>唤醒等待的工作线程；</li>
+</ol>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b81d0 in nanosleep () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000717cb9 in os_thread_sleep_low ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000001d8fb0a in nsvr_schedule_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_chkpnt_thd">dm_chkpnt_thd</h2>
+<p>flush checkpoint 的线程。主要负责 CKPT_LSN 的管理。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000703cbc in os_event2_wait ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000000d52ef8 in ckpt2_flush_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div><h2 id="dm_quit_thd">dm_quit_thd</h2>
+<p>执行正常 shutdown 操作的线程。</p>
+<p>创建此线程的堆栈如下：</p>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-md" data-lang="md"><span style="display:flex;"><span><span style="font-weight:bold">#0  0x00007ffff79b44ac in pthread_cond_wait@@GLIBC_2.3.2 () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#1  0x0000000000717a62 in os_semaphore_p ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#2  0x0000000001d95bfe in nsvr_quit_thread ()
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#3  0x00007ffff79ae1da in start_thread () from /lib64/libpthread.so
+</span></span></span><span style="display:flex;"><span><span style="font-weight:bold">#4  0x00007ffff6cffe73 in clone () from /lib64/libc.so
+</span></span></span></code></pre></div>
+        </div>
+
+        <div class="row middle-xs">
+          <div class="col-xs-12">
+            
+          </div>
+        </div>
+        
+          <div class="row">
+            <div class="col-xs-12">
+              
+            </div>
+          </div>
+
+          
+
+
+
+          
+          
+          <div style="height: 50px;"></div>
+          
+        
+
+        <div class="site-footer">
+  
+  
+</div>
+
+      </div>
+    </div>
+  </article>
+
+  
+<script>
+  
+  document.addEventListener("DOMContentLoaded", function() {
+    const disqus = document.getElementById('disqus_thread');
+    if (!disqus) {
+      return;
+    }
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        const iframes = disqus.getElementsByTagName('iframe');
+        if (iframes.length > 1) {
+          const commentsIframe = iframes[1];
+          while (disqus.firstChild) {
+            disqus.removeChild(disqus.firstChild);
+          }
+          disqus.appendChild(commentsIframe);
+          observer.disconnect();
+        }
+      });
+    });
+    observer.observe(disqus, { childList: true, subtree: true });
+  });
+</script>
+
+  
+
+</body>
+
+</html>

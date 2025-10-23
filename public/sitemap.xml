@@ -2,14 +2,44 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>http://localhost:1313/</loc>
-    <lastmod>2025-10-23T15:49:00+08:00</lastmod>
+    <loc>http://localhost:1313/posts/batch-param-opt/</loc>
+    <lastmod>2025-10-23T17:12:01+08:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/my-first-post/</loc>
-    <lastmod>2025-10-23T15:49:00+08:00</lastmod>
+    <loc>http://localhost:1313/</loc>
+    <lastmod>2025-10-23T17:12:01+08:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/posts/</loc>
-    <lastmod>2025-10-23T15:49:00+08:00</lastmod>
+    <lastmod>2025-10-23T17:12:01+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/database-cache/</loc>
+    <lastmod>2025-10-23T17:03:53+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/view-filter-merging/</loc>
+    <lastmod>2025-10-23T17:03:09+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/complex-view-merging/</loc>
+    <lastmod>2025-10-23T17:01:59+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/dm-thread/</loc>
+    <lastmod>2025-10-23T17:01:12+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/mysql-installation/</loc>
+    <lastmod>2025-10-23T17:00:41+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/postgres-installation/</loc>
+    <lastmod>2025-10-23T17:00:05+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/axios-post-packaging/</loc>
+    <lastmod>2025-10-23T16:58:16+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/shui-diao-ge-tou/</loc>
+    <lastmod>2025-10-23T16:57:43+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/work-consumerism-and-the-new-poor/</loc>
+    <lastmod>2025-10-23T16:56:46+08:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/on-protracted-war/</loc>
+    <lastmod>2025-10-23T16:56:10+08:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/categories/</loc>
   </url><url>

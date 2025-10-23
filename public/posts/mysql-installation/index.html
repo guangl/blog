@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en-us" prefix="og: http://ogp.me/ns#">
+<html lang="en">
 <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
   <meta charset="utf-8" />
   <meta name="generator" content="Hugo 0.151.2">
@@ -7,8 +7,8 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="author" content="" />
-  <meta property="og:url" content="http://localhost:1313/" />
-  <link rel="canonical" href="http://localhost:1313/" /><link
+  <meta property="og:url" content="http://localhost:1313/posts/mysql-installation/" />
+  <link rel="canonical" href="http://localhost:1313/posts/mysql-installation/" /><link
     rel="alternate"
     type="application/atom+xml"
     href="http://localhost:1313/index.xml"
@@ -23,10 +23,10 @@
            "@type": "WebPage",
            "@id": "http:\/\/localhost:1313\/"
       },
-      "articleSection" : "",
-      "name" : "guangluo\u0027s blog",
-      "headline" : "guangluo\u0027s blog",
-      "description" : "",
+      "articleSection" : "posts",
+      "name" : "Mysql 安装",
+      "headline" : "Mysql 安装",
+      "description" : "安装 mysql 8.0.35\n下载依赖 # 下载 yum 源 wget https:\/\/repo.mysql.com\/\/mysql80-community-release-el8-9.noarch.rpm yum module -y disable mysql # 安装 rpm 源 rpm -ivh mysql80-community-release-el8-9.noarch.rpm # 安装 mysql-community-server dnf install mysql-community-server -y # 启动 mysql systemctl start mysqld systemctl enable mysqld # 第一次查询 mysql root 初始密码 grep \u0026#39;temporary password\u0026#39; \/var\/log\/mysqld.log 初始化设置 -- 修改密码（必须包含大写、小写、特殊符号） alter user \u0026#39;root\u0026#39;@\u0026#39;localhost\u0026#39; identified by \u0026#39;DMDBA_hust4400\u0026#39;; -- 安装验证插件，可以不用包含大写、小写、特殊符号。 install plugin validate_password soname \u0026#39;validate_password.so\u0026#39;; -- 验证是否启用验证插件 select plugin_name, plugin_status from information_schema.plugins where plugin_name = \u0026#39;validate_password\u0026#39;; -- 查询 validate_password 策略 show variables like \u0026#39;validate_password%\u0026#39;; -- 设置 validate_password 策略 set global validate_password.policy = 0; set global validate_password.length = 0; set global validate_password.check_user_name = 0; -- 修改 root 密码 alter user \u0026#39;root\u0026#39;@\u0026#39;localhost\u0026#39; identified by \u0026#39;root\u0026#39;; -- 创建表空间 create tablespace ts_test add datafile \u0026#39;test.ibd\u0026#39; engine=innodb; -- 创建可在任何地方访问的用户 create user \u0026#39;test\u0026#39;@\u0026#39;%\u0026#39; identified by \u0026#39;test\u0026#39;; -- 创建数据库 create database testdb; -- 授予 test 上所有权限给 test 用户 grant all privileges on testdb.* to \u0026#39;test\u0026#39;@\u0026#39;%\u0026#39;; -- 刷新权限 flush privileges; ",
       "inLanguage" : "en-US",
       "author" : "",
       "creator" : "",
@@ -34,17 +34,25 @@
       "accountablePerson" : "",
       "copyrightHolder" : "",
       "copyrightYear" : "2025",
-      "datePublished": "2025-10-23 17:12:01 \u002b0800 CST",
-      "dateModified" : "2025-10-23 17:12:01 \u002b0800 CST",
-      "url" : "http:\/\/localhost:1313\/",
+      "datePublished": "2025-10-23 17:00:41 \u002b0800 CST",
+      "dateModified" : "2025-10-23 17:00:41 \u002b0800 CST",
+      "url" : "http:\/\/localhost:1313\/posts\/mysql-installation\/",
       "keywords" : [  ]
   }
 </script>
-<title>guangluo&#39;s blog</title>
-  <meta property="og:title" content="guangluo&#39;s blog" />
-  <meta property="og:type" content="website" />
-  <meta property="og:description" content="" />
-  <meta name="description" content="" />
+<title>Mysql 安装</title>
+  <meta property="og:title" content="Mysql 安装" />
+  <meta property="og:type" content="article" />
+  <meta
+    property="og:description"
+    content="安装 mysql 8.0.35
+下载依赖 # 下载 yum 源 wget https://repo.mysql.com//mysql80-community-release-el8-9.noarch.rpm yum module -y disable mysql # 安装 rpm 源 rpm -ivh mysql80-community-release-el8-9.noarch.rpm # 安装 mysql-community-server dnf install mysql-community-server -y # 启动 mysql systemctl start mysqld systemctl enable mysqld # 第一次查询 mysql root 初始密码 grep &#39;temporary password&#39; /var/log/mysqld.log 初始化设置 -- 修改密码（必须包含大写、小写、特殊符号） alter user &#39;root&#39;@&#39;localhost&#39; identified by &#39;DMDBA_hust4400&#39;; -- 安装验证插件，可以不用包含大写、小写、特殊符号。 install plugin validate_password soname &#39;validate_password.so&#39;; -- 验证是否启用验证插件 select plugin_name, plugin_status from information_schema.plugins where plugin_name = &#39;validate_password&#39;; -- 查询 validate_password 策略 show variables like &#39;validate_password%&#39;; -- 设置 validate_password 策略 set global validate_password.policy = 0; set global validate_password.length = 0; set global validate_password.check_user_name = 0; -- 修改 root 密码 alter user &#39;root&#39;@&#39;localhost&#39; identified by &#39;root&#39;; -- 创建表空间 create tablespace ts_test add datafile &#39;test.ibd&#39; engine=innodb; -- 创建可在任何地方访问的用户 create user &#39;test&#39;@&#39;%&#39; identified by &#39;test&#39;; -- 创建数据库 create database testdb; -- 授予 test 上所有权限给 test 用户 grant all privileges on testdb.* to &#39;test&#39;@&#39;%&#39;; -- 刷新权限 flush privileges; "
+  />
+  <meta
+    name="description"
+    content="安装 mysql 8.0.35
+下载依赖 # 下载 yum 源 wget https://repo.mysql.com//mysql80-community-release-el8-9.noarch.rpm yum module -y disable mysql # 安装 rpm 源 rpm -ivh mysql80-community-release-el8-9.noarch.rpm # 安装 mysql-community-server dnf install mysql-community-server -y # 启动 mysql systemctl start mysqld systemctl enable mysqld # 第一次查询 mysql root 初始密码 grep &#39;temporary password&#39; /var/log/mysqld.log 初始化设置 -- 修改密码（必须包含大写、小写、特殊符号） alter user &#39;root&#39;@&#39;localhost&#39; identified by &#39;DMDBA_hust4400&#39;; -- 安装验证插件，可以不用包含大写、小写、特殊符号。 install plugin validate_password soname &#39;validate_password.so&#39;; -- 验证是否启用验证插件 select plugin_name, plugin_status from information_schema.plugins where plugin_name = &#39;validate_password&#39;; -- 查询 validate_password 策略 show variables like &#39;validate_password%&#39;; -- 设置 validate_password 策略 set global validate_password.policy = 0; set global validate_password.length = 0; set global validate_password.check_user_name = 0; -- 修改 root 密码 alter user &#39;root&#39;@&#39;localhost&#39; identified by &#39;root&#39;; -- 创建表空间 create tablespace ts_test add datafile &#39;test.ibd&#39; engine=innodb; -- 创建可在任何地方访问的用户 create user &#39;test&#39;@&#39;%&#39; identified by &#39;test&#39;; -- 创建数据库 create database testdb; -- 授予 test 上所有权限给 test 用户 grant all privileges on testdb.* to &#39;test&#39;@&#39;%&#39;; -- 刷新权限 flush privileges; "
+  />
   <meta property="og:locale" content="en-us" /><meta property="og:image" content="" />
   
   
@@ -69,10 +77,11 @@
 
 
 <body>
-  <article class="posts">
+  <article class="post " id="article">
     <div class="row">
       <div class="col-xs-12">
-        
+        <div class="site-header">
+          
 <header>
   <div class="header-title">
     <a href="/"
@@ -93,190 +102,97 @@
 </div>
 <div class="header-line"></div>
 
-        <div id="posts-list">
-          <section>
-            <h1 class="site-date-catalog">2025</h1>
-
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:12:01 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/batch-param-opt/">BATCH_PARAM_OPT</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:03:53 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/database-cache/">数据库缓存</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:03:09 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/view-filter-merging/">VIEW_FILTER_MERGING</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:01:59 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/complex-view-merging/">COMPLEX_VIEW_MERGING</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:01:12 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/dm-thread/">达梦数据库单机线程</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:00:41 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/mysql-installation/">Mysql 安装</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 17:00:05 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/postgres-installation/">Postgres 安装</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:58:16 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/axios-post-packaging/">Axios 二次封装</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:57:43 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/shui-diao-ge-tou/">水调歌头</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:56:46 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/work-consumerism-and-the-new-poor/">工作、消费、新穷人</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="row posts-line">
-              <div class="posts-date col-xs-3 col-sm-2">
-                <time datetime="2025-10-23 16:56:10 CST">Oct 23</time>
-              </div>
-              <div class="posts-title col-xs-9 col-sm-10">
-                <div class="row">
-                  <div class="col-xs-11 col-sm-10">
-                    <a href="/posts/on-protracted-war/">论持久战</a>
-                  </div>
-                  <div class="col-xs-1 col-sm-2 posts-categories">
-                    
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-          </section>
-          
         </div>
+        <header class="post-header">
+          <h1 class="post-title">Mysql 安装</h1>
+          
+          <div class="row post-desc">
+            <div class="col-xs-6">
+              
+              <time class="post-date" datetime="2025-10-23 17:00:41 CST">
+                23 Oct 2025
+              </time>
+              
+            </div>
+            <div class="col-xs-6">
+              
+            </div>
+          </div>
+          
+        </header>
+
+        <div class="post-content markdown-body">
+          
+          <p>安装 mysql 8.0.35</p>
+<h2 id="下载依赖">下载依赖</h2>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="font-style:italic"># 下载 yum 源</span>
+</span></span><span style="display:flex;"><span>wget https://repo.mysql.com//mysql80-community-release-el8-9.noarch.rpm
+</span></span><span style="display:flex;"><span>yum module -y disable mysql
+</span></span><span style="display:flex;"><span><span style="font-style:italic"># 安装 rpm 源</span>
+</span></span><span style="display:flex;"><span>rpm -ivh mysql80-community-release-el8-9.noarch.rpm
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic"># 安装 mysql-community-server</span>
+</span></span><span style="display:flex;"><span>dnf install mysql-community-server -y
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic"># 启动 mysql</span>
+</span></span><span style="display:flex;"><span>systemctl start mysqld
+</span></span><span style="display:flex;"><span>systemctl enable mysqld
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic"># 第一次查询 mysql root 初始密码</span>
+</span></span><span style="display:flex;"><span>grep <span style="font-style:italic">&#39;temporary password&#39;</span> /var/log/mysqld.log
+</span></span></code></pre></div><h2 id="初始化设置">初始化设置</h2>
+<div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-style:italic">-- 修改密码（必须包含大写、小写、特殊符号）
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">alter</span> <span style="font-weight:bold">user</span> <span style="font-style:italic">&#39;root&#39;</span>@<span style="font-style:italic">&#39;localhost&#39;</span> identified <span style="font-weight:bold">by</span> <span style="font-style:italic">&#39;DMDBA_hust4400&#39;</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 安装验证插件，可以不用包含大写、小写、特殊符号。
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span>install plugin validate_password soname <span style="font-style:italic">&#39;validate_password.so&#39;</span>;
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 验证是否启用验证插件
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">select</span> plugin_name, plugin_status <span style="font-weight:bold">from</span> information_schema.plugins <span style="font-weight:bold">where</span> plugin_name = <span style="font-style:italic">&#39;validate_password&#39;</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 查询 validate_password 策略
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">show</span> variables <span style="font-weight:bold">like</span> <span style="font-style:italic">&#39;validate_password%&#39;</span>;
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 设置 validate_password 策略
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">set</span> <span style="font-weight:bold">global</span> validate_password.policy = 0;
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">set</span> <span style="font-weight:bold">global</span> validate_password.<span style="font-weight:bold">length</span> = 0;
+</span></span><span style="display:flex;"><span><span style="font-weight:bold">set</span> <span style="font-weight:bold">global</span> validate_password.check_user_name = 0;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 修改 root 密码
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">alter</span> <span style="font-weight:bold">user</span> <span style="font-style:italic">&#39;root&#39;</span>@<span style="font-style:italic">&#39;localhost&#39;</span> identified <span style="font-weight:bold">by</span> <span style="font-style:italic">&#39;root&#39;</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 创建表空间
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">create</span> tablespace ts_test <span style="font-weight:bold">add</span> datafile <span style="font-style:italic">&#39;test.ibd&#39;</span> engine=innodb;
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 创建可在任何地方访问的用户
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">create</span> <span style="font-weight:bold">user</span> <span style="font-style:italic">&#39;test&#39;</span>@<span style="font-style:italic">&#39;%&#39;</span> identified <span style="font-weight:bold">by</span> <span style="font-style:italic">&#39;test&#39;</span>;
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 创建数据库
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">create</span> <span style="font-weight:bold">database</span> testdb;
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 授予 test 上所有权限给 test 用户
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span><span style="font-weight:bold">grant</span> <span style="font-weight:bold">all</span> <span style="font-weight:bold">privileges</span> <span style="font-weight:bold">on</span> testdb.* <span style="font-weight:bold">to</span> <span style="font-style:italic">&#39;test&#39;</span>@<span style="font-style:italic">&#39;%&#39;</span>;
+</span></span><span style="display:flex;"><span><span style="font-style:italic">-- 刷新权限
+</span></span></span><span style="display:flex;"><span><span style="font-style:italic"></span>flush <span style="font-weight:bold">privileges</span>;
+</span></span></code></pre></div>
+        </div>
+
+        <div class="row middle-xs">
+          <div class="col-xs-12">
+            
+          </div>
+        </div>
+        
+          <div class="row">
+            <div class="col-xs-12">
+              
+            </div>
+          </div>
+
+          
+
+
+
+          
+          
+          <div style="height: 50px;"></div>
+          
+        
 
         <div class="site-footer">
   
@@ -311,6 +227,8 @@
     observer.observe(disqus, { childList: true, subtree: true });
   });
 </script>
+
+  
 
 </body>
 
