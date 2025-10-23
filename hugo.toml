@@ -1,4 +1,4 @@
-baseURL = 'https://guangluo.github.io/blog/'
+baseURL = 'https://guangl.github.io/blog/'
 languageCode = 'en-us'
 title = "guangluo's blog"
 theme = "yinyang"
@@ -15,7 +15,7 @@ tabWidth = 2
 
 [author]
 name = "guangluo"
-homepage = "https://guangluo.github.io/blog/"
+homepage = "https://guangl.github.io/blog/"
 
 [params]
 headTitle = "Guang Luo"
