@@ -1,0 +1,26 @@
+baseURL = 'https://blog.guangluo.top/'
+languageCode = 'en-us'
+title = "guangluo's blog"
+theme = "yinyang"
+
+[markup]
+[markup.goldmark]
+[markup.goldmark.renderer]
+unsafe = true
+[markup.highlight]
+guessSyntax = true
+noClasses = true
+style = "bw"
+tabWidth = 2
+
+[author]
+name = "guangluo"
+homepage = "https://blog.guangluo.top/"
+
+[params]
+headTitle = "Guang Luo"
+mainSections = ["posts"]
+
+[[params.socials]]
+name = "Github"
+link = "https://github.com/guangluo"
