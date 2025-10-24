@@ -42,10 +42,10 @@ BUILD_FORWARD_RS  = 1
 此时执行两次准备的 SQL，观察执行号，如果第二次执行号为 0，根据经验说明走了缓存。
 
 第一次执行截图如下
-![database-cache-01](/database/database-cache-01.png)
+![database-cache-01](attachments/database-cache-01.png)
 
 第二次执行截图如下，说明走了缓存
-![database-cache-02](/database/database-cache-02.png)
+![database-cache-02](attachments/database-cache-02.png)
 
 > [!NOTE]
 > 如果你观察仔细的话，就会发现，数据库 sqllog 的 `EXEC_ID` 与实际的 `EXEC_ID` 其实并不一致，就比如开启了服务端缓存，实际的 `EXEC_ID` 是 `0`，但是 sqllog 中是 `-1`。
@@ -125,17 +125,17 @@ public class Main {
 
 `debug` 第一个 `statement` 就可以发现，此时已经把结果集加入到 `DmdbResultSetCachePool` 中了。
 
-![client-result-cache-add](/database/database-cache-03.png)
+![client-result-cache-add](attachments/database-cache-03.png)
 
 此类提供了一个专属的 `Map` 来存放结果集。
 
-![client-result-cache](/database/database-cache-04.png)
+![client-result-cache](attachments/database-cache-04.png)
 
 并且，在每次创建 `statement` 的时候均会判断是否使用了客户端缓存、是否存在客户端缓存。
 
-![是否存在客户端缓存](/database/database-cache-05.png)
+![是否存在客户端缓存](attachments/database-cache-05.png)
 
-![是否使用客户端缓存](/database/database-cache-06.png)
+![是否使用客户端缓存](attachments/database-cache-06.png)
 
 ### 注意事项
 

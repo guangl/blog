@@ -31,7 +31,7 @@ title = '单机在线转换成主备'
 
 如出现以下截图即代表启动成功：
 
-![单机实例启动成功](/database/single-machine-online-to-master-slave-01.png)
+![单机实例启动成功](attachments/single-machine-online-to-master-slave-01.png)
 
 ## 开启归档
 
@@ -59,7 +59,7 @@ CREATE TABLE TEST_LG ( A1 INT, A2 VARCHAR(255), A3 CLOB );
 
 建立 jmeter 的 workflow，如图下所示：
 
-![jmeter workflow](/database/single-machine-online-to-master-slave-02.png)
+![jmeter workflow](attachments/single-machine-online-to-master-slave-02.png)
 
 ## 联机备份
 
@@ -99,7 +99,7 @@ CALL SP_SET_PARA_VALUE(1,'MAL_INI',1);
 
 出现以下截图则代表操作成功：
 
-![add dmmal setting successfully](/database/single-machine-online-to-master-slave-03.png)
+![add dmmal setting successfully](attachments/single-machine-online-to-master-slave-03.png)
 
 
 ## 添加 `REALTIME` 归档
@@ -262,4 +262,4 @@ sp_set_oguid(20250708);
 
 见到如下截图，则代表搭建成功。
 
-![dmmonitor](/database/single-machine-online-to-master-slave-04.png)
+![dmmonitor](attachments/single-machine-online-to-master-slave-04.png)
