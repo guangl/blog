@@ -37,7 +37,7 @@ title = 'BATCH_PARAM_OPT'
 
 有一些疑问，疑问如下：
 1. 如果参数表够大触发了刷盘，会使用 `TEMP` 表空间吗？
-![alt text](/database/batch-param-opt-01.jpg)
+![alt text](attachments/batch-param-opt-01.jpg)
 答案是**会返回 `EC_SRC_MULTI_ROWS` 错误**，让客户端使用非批量的方式重试。
 
 #### `INSERT` 优化原理
@@ -48,9 +48,9 @@ insert into users values ( ?, ?, ?, ? );
 ```
 
 * `BATCH_PARAM_OPT = 0` 时候的计划
-![alt text](/database/batch-param-opt-02.png)
+![alt text](attachments/batch-param-opt-02.png)
 * `BATCH_PARAM_OPT = 1` 时候的计划
-![alt text](/database/batch-param-opt-03.png)
+![alt text](attachments/batch-param-opt-03.png)
 `INSERT` 参数中的 `type` 取值，会改变成 `select`
 
 他会将 SQL 转换为
@@ -80,9 +80,9 @@ update users set a = ? where b = ? and c = ? and d = ?
 ```
 
 * `BATCH_PARAM_OPT = 0` 时候的计划
-![alt text](/database/batch-param-opt-04.png)
+![alt text](attachments/batch-param-opt-04.png)
 * `BATCH_PARAM_OPT = 1` 时候的计划
-![](/database/batch-param-opt-05.png)
+![](attachments/batch-param-opt-05.png)
 依旧可以看到，将插入的参数转换为参数表并且与 `USERS` 做 `HASH` 连接。这样可以免于将 `USERS` 扫描 100w 次，只需要扫描一次即可。
 
 等于将此 SQL 改写成了
@@ -108,7 +108,7 @@ preparedStatement.addBatch();
 ```
 
 最后会是将 a 的值更新为 2 还是 4 呢？来看下 sqllog 的截图
-![alt text](/database/batch-param-opt-06.png)
+![alt text](attachments/batch-param-opt-06.png)
 首先使用了 `PSCN` 优化，但是途中报错 `-5004`，然后去掉了 `PSCN` 优化，重新执行。
 `-5004` 的含义为：无法在源表中获得一组稳定的行，因为我的 `where` 条件是相同的，所以会获得两行，确实报错。所以说，他不会单纯的对比参数表的整行数据，因为我更新的值是不一致的，他会对比 `where` 之后条件那一行的数据。
 
@@ -129,15 +129,15 @@ delete from users where a = ? and b = ? and c = ? and d = ?
 ```
 
 * `BATCH_PARAM_OPT = 0` 时候的计划
-![alt text](/database/batch-param-opt-07.png)
+![alt text](attachments/batch-param-opt-07.png)
 * `BATCH_PARAM_OPT = 1` 无索引时候的计划
-![alt text](/database/batch-param-opt-08.png)
+![alt text](attachments/batch-param-opt-08.png)
 * `BATCH_PARAM_OPT = 1` 有主键的时候的计划
-![alt text](/database/batch-param-opt-09.png)
+![alt text](attachments/batch-param-opt-09.png)
 * `BATCH_PARAM_OPT = 1` 有唯一非聚集索引时候的计划
-![alt text](/database/batch-param-opt-10.png)
+![alt text](attachments/batch-param-opt-10.png)
 * `BATCH_PARAM_OPT = 1` 有聚集索引时候的计划
-![alt text](/database/batch-param-opt-11.png)
+![alt text](attachments/batch-param-opt-11.png)
 一样可以通过 `users` 表的情况（增加索引，增加 hint）来优化删除的 `SQL`。
 
 ### `BATCH_PARAM_OPT=2` （操作符优化）
@@ -216,22 +216,22 @@ public class Main {
 * `BATCH_PARAM_OPT = 2` 执行时间为 26295ms；
 
 `BATCH_PARAM_OPT = 0` 的 sqllog 截图。
-![alt text](/database/batch-param-opt-12.png)
+![alt text](attachments/batch-param-opt-12.png)
 `BATCH_PARAM_OPT = 1` 的 sqllog 截图。
-![alt text](/database/batch-param-opt-13.png)
+![alt text](attachments/batch-param-opt-13.png)
 `BATCH_PARAM_OPT = 2` 的 sqllog 截图。
-![alt text](/database/batch-param-opt-14.png)
+![alt text](attachments/batch-param-opt-14.png)
 三种取值的柱状图如下
-![alt text](/database/batch-param-opt-15.png)
+![alt text](attachments/batch-param-opt-15.png)
 
 
 > [!WARNING]
 > 1. 只能是单组值的批量插入，只能是 `insert into test values ( ? )`，不能是 `insert into test values ( ? ), ( ? )`，也不能是 `insert into test select a from test_1`；但是为啥不支持这个优化呢？
 > 2. 插入的时候不能带默认值，也就是不能是 `insert into test values ( ?, DEFAULT )`；
 
-![alt text](/database/batch-param-opt-16.png)
+![alt text](attachments/batch-param-opt-16.png)
 `insert into users values ( ? ), ( ? )` 确实是不支持优化。
-![alt text](/database/batch-param-opt-17.png)
+![alt text](attachments/batch-param-opt-17.png)
 同样，`insert into users values ( ?, ?, ?, default )` 也确实不支持优化。
 
 ### `UPDATE` 测试
@@ -249,22 +249,22 @@ UPDATE USERS SET A = ? WHERE B = ? AND C = ? AND D = ?
 * `BATCH_PARAM_OPT = 2` 执行时间为 674550ms；
 
 `BATCH_PARAM_OPT = 0` 的 sqllog 截图
-![alt text](/database/batch-param-opt-18.png)
+![alt text](attachments/batch-param-opt-18.png)
 `BATCH_PARAM_OPT = 1` 的 sqllog 截图
-![alt text](/database/batch-param-opt-19.png)
+![alt text](attachments/batch-param-opt-19.png)
 `BATCH_PARAM_OPT = 2` 的 sqllog 截图
-![alt text](/database/batch-param-opt-20.png)
+![alt text](attachments/batch-param-opt-20.png)
 
 三种取值的柱状图如下
-![alt text](/database/batch-param-opt-21.png)
+![alt text](attachments/batch-param-opt-21.png)
 
 > [!WARNING]
 > 1. 如果 where 条件出现了更新列，则不能优化；`update users set a = b+1 where a = ?`
 > 2. 如果 where 条件是非等值条件，则不能优化；（批量绑定中，会对同一行反复更新，后一次更新会依赖前一次更新，所以不能优化）`update users set a = a+1 where b > ?`
 
-![alt text](/database/batch-param-opt-22.png)
+![alt text](attachments/batch-param-opt-22.png)
 `update users set a = b+1 where a = ?` 无法优化。
-![alt text](/database/batch-param-opt-23.png)
+![alt text](attachments/batch-param-opt-23.png)
 `update users set a = a+1 where b > ?` 确实无法优化。
 
 #### 存在唯一索引的情况
@@ -280,24 +280,24 @@ create unique index u_idx_users_b_lg on users(b);
 * `BATCH_PARAM_OPT = 2` 的执行时间为 52973ms；
 
 `BATCH_PARAM_OPT = 0` 的 sqllog 截图
-![alt text](/database/batch-param-opt-24.png)
+![alt text](attachments/batch-param-opt-24.png)
 `BATCH_PARAM_OPT = 1` 的 sqllog 截图
 执行计划为
-![alt text](/database/batch-param-opt-25.png)
+![alt text](attachments/batch-param-opt-25.png)
 速度为
-![alt text](/database/batch-param-opt-26.png)
+![alt text](attachments/batch-param-opt-26.png)
 此时测试一下 100w 不带唯一索引的速度
-![alt text](/database/batch-param-opt-27.png)
+![alt text](attachments/batch-param-opt-27.png)
 其实非常近似，执行计划为
-![alt text](/database/batch-param-opt-28.png)
+![alt text](attachments/batch-param-opt-28.png)
 所以可以发现，带不带唯一索引其实对 `BATCH_PARAM_OPT = 1` 的执行计划~~没有关系~~，所以执行时间非常近似。
 其实也有一些关系，当把索引改成全列索引时，就会走 `SSCN`，从而减少扫描页数来优化执行速度。
-![alt text](/database/batch-param-opt-29.png)
-![alt text](/database/batch-param-opt-30.png)
+![alt text](attachments/batch-param-opt-29.png)
+![alt text](attachments/batch-param-opt-30.png)
 `BATCH_PARAM_OPT = 2` 的 sqllog 截图
-![alt text](/database/batch-param-opt-31.png)
+![alt text](attachments/batch-param-opt-31.png)
 三种取值的柱状图如下
-![alt text](/database/batch-param-opt-32.png)
+![alt text](attachments/batch-param-opt-32.png)
 
 ### `DELETE` 测试
 
@@ -317,13 +317,13 @@ create unique index uidx_users_a_dmlg on users (a);
 * `BATCH_PARAM_OPT = 2` 的执行时间为 16954ms；
 
 `BATCH_PARAM_OPT = 0` 的 sqllog 的截图
-![alt text](/database/batch-param-opt-33.png)
-![alt text](/database/batch-param-opt-34.png)
+![alt text](attachments/batch-param-opt-33.png)
+![alt text](attachments/batch-param-opt-34.png)
 `BATCH_PARAM_OPT = 1` 的 sqllog 的截图
-![alt text](/database/batch-param-opt-35.png)
-![alt text](/database/batch-param-opt-36.png)
+![alt text](attachments/batch-param-opt-35.png)
+![alt text](attachments/batch-param-opt-36.png)
 `BATCH_PARAM_OPT = 2` 的 sqllog 的截图
-![alt text](/database/batch-param-opt-37.png)
-![alt text](/database/batch-param-opt-38.png)
+![alt text](attachments/batch-param-opt-37.png)
+![alt text](attachments/batch-param-opt-38.png)
 三种取值的柱状图如下
-![alt text](/database/batch-param-opt-39.png)
+![alt text](attachments/batch-param-opt-39.png)

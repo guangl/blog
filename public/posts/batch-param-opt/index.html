@@ -173,7 +173,7 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 <p>有一些疑问，疑问如下：</p>
 <ol>
 <li>如果参数表够大触发了刷盘，会使用 <code>TEMP</code> 表空间吗？
-<img src="/database/batch-param-opt-01.jpg" alt="alt text">
+<img src="attachments/batch-param-opt-01.jpg" alt="alt text">
 答案是<strong>会返回 <code>EC_SRC_MULTI_ROWS</code> 错误</strong>，让客户端使用非批量的方式重试。</li>
 </ol>
 <h4 id="insert-优化原理"><code>INSERT</code> 优化原理</h4>
@@ -181,9 +181,9 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 <div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">insert</span> <span style="font-weight:bold">into</span> users <span style="font-weight:bold">values</span> ( ?, ?, ?, ? );
 </span></span></code></pre></div><ul>
 <li><code>BATCH_PARAM_OPT = 0</code> 时候的计划
-<img src="/database/batch-param-opt-02.png" alt="alt text"></li>
+<img src="attachments/batch-param-opt-02.png" alt="alt text"></li>
 <li><code>BATCH_PARAM_OPT = 1</code> 时候的计划
-<img src="/database/batch-param-opt-03.png" alt="alt text">
+<img src="attachments/batch-param-opt-03.png" alt="alt text">
 <code>INSERT</code> 参数中的 <code>type</code> 取值，会改变成 <code>select</code></li>
 </ul>
 <p>他会将 SQL 转换为</p>
@@ -235,9 +235,9 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 <div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">update</span> users <span style="font-weight:bold">set</span> a = ? <span style="font-weight:bold">where</span> b = ? <span style="font-weight:bold">and</span> <span style="font-weight:bold">c</span> = ? <span style="font-weight:bold">and</span> d = ?
 </span></span></code></pre></div><ul>
 <li><code>BATCH_PARAM_OPT = 0</code> 时候的计划
-<img src="/database/batch-param-opt-04.png" alt="alt text"></li>
+<img src="attachments/batch-param-opt-04.png" alt="alt text"></li>
 <li><code>BATCH_PARAM_OPT = 1</code> 时候的计划
-<img src="/database/batch-param-opt-05.png" alt="">
+<img src="attachments/batch-param-opt-05.png" alt="">
 依旧可以看到，将插入的参数转换为参数表并且与 <code>USERS</code> 做 <code>HASH</code> 连接。这样可以免于将 <code>USERS</code> 扫描 100w 次，只需要扫描一次即可。</li>
 </ul>
 <p>等于将此 SQL 改写成了</p>
@@ -256,7 +256,7 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 </span></span><span style="display:flex;"><span>preparedStatement.setInt(4, 1);
 </span></span><span style="display:flex;"><span>preparedStatement.addBatch();
 </span></span></code></pre></div><p>最后会是将 a 的值更新为 2 还是 4 呢？来看下 sqllog 的截图
-<img src="/database/batch-param-opt-06.png" alt="alt text">
+<img src="attachments/batch-param-opt-06.png" alt="alt text">
 首先使用了 <code>PSCN</code> 优化，但是途中报错 <code>-5004</code>，然后去掉了 <code>PSCN</code> 优化，重新执行。
 <code>-5004</code> 的含义为：无法在源表中获得一组稳定的行，因为我的 <code>where</code> 条件是相同的，所以会获得两行，确实报错。所以说，他不会单纯的对比参数表的整行数据，因为我更新的值是不一致的，他会对比 <code>where</code> 之后条件那一行的数据。</p>
 <blockquote>
@@ -277,15 +277,15 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 <div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">delete</span> <span style="font-weight:bold">from</span> users <span style="font-weight:bold">where</span> a = ? <span style="font-weight:bold">and</span> b = ? <span style="font-weight:bold">and</span> <span style="font-weight:bold">c</span> = ? <span style="font-weight:bold">and</span> d = ?
 </span></span></code></pre></div><ul>
 <li><code>BATCH_PARAM_OPT = 0</code> 时候的计划
-<img src="/database/batch-param-opt-07.png" alt="alt text"></li>
+<img src="attachments/batch-param-opt-07.png" alt="alt text"></li>
 <li><code>BATCH_PARAM_OPT = 1</code> 无索引时候的计划
-<img src="/database/batch-param-opt-08.png" alt="alt text"></li>
+<img src="attachments/batch-param-opt-08.png" alt="alt text"></li>
 <li><code>BATCH_PARAM_OPT = 1</code> 有主键的时候的计划
-<img src="/database/batch-param-opt-09.png" alt="alt text"></li>
+<img src="attachments/batch-param-opt-09.png" alt="alt text"></li>
 <li><code>BATCH_PARAM_OPT = 1</code> 有唯一非聚集索引时候的计划
-<img src="/database/batch-param-opt-10.png" alt="alt text"></li>
+<img src="attachments/batch-param-opt-10.png" alt="alt text"></li>
 <li><code>BATCH_PARAM_OPT = 1</code> 有聚集索引时候的计划
-<img src="/database/batch-param-opt-11.png" alt="alt text">
+<img src="attachments/batch-param-opt-11.png" alt="alt text">
 一样可以通过 <code>users</code> 表的情况（增加索引，增加 hint）来优化删除的 <code>SQL</code>。</li>
 </ul>
 <h3 id="batch_param_opt2-操作符优化"><code>BATCH_PARAM_OPT=2</code> （操作符优化）</h3>
@@ -354,13 +354,13 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 <li><code>BATCH_PARAM_OPT = 2</code> 执行时间为 26295ms；</li>
 </ul>
 <p><code>BATCH_PARAM_OPT = 0</code> 的 sqllog 截图。
-<img src="/database/batch-param-opt-12.png" alt="alt text">
+<img src="attachments/batch-param-opt-12.png" alt="alt text">
 <code>BATCH_PARAM_OPT = 1</code> 的 sqllog 截图。
-<img src="/database/batch-param-opt-13.png" alt="alt text">
+<img src="attachments/batch-param-opt-13.png" alt="alt text">
 <code>BATCH_PARAM_OPT = 2</code> 的 sqllog 截图。
-<img src="/database/batch-param-opt-14.png" alt="alt text">
+<img src="attachments/batch-param-opt-14.png" alt="alt text">
 三种取值的柱状图如下
-<img src="/database/batch-param-opt-15.png" alt="alt text"></p>
+<img src="attachments/batch-param-opt-15.png" alt="alt text"></p>
 <blockquote>
 <p>[!WARNING]</p>
 <ol>
@@ -368,9 +368,9 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 <li>插入的时候不能带默认值，也就是不能是 <code>insert into test values ( ?, DEFAULT )</code>；</li>
 </ol>
 </blockquote>
-<p><img src="/database/batch-param-opt-16.png" alt="alt text">
+<p><img src="attachments/batch-param-opt-16.png" alt="alt text">
 <code>insert into users values ( ? ), ( ? )</code> 确实是不支持优化。
-<img src="/database/batch-param-opt-17.png" alt="alt text">
+<img src="attachments/batch-param-opt-17.png" alt="alt text">
 同样，<code>insert into users values ( ?, ?, ?, default )</code> 也确实不支持优化。</p>
 <h3 id="update-测试"><code>UPDATE</code> 测试</h3>
 <p>表结构同上，同样插入上面的 100w 数据。<code>UPDATE</code> SQL 如下</p>
@@ -383,13 +383,13 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 <li><code>BATCH_PARAM_OPT = 2</code> 执行时间为 674550ms；</li>
 </ul>
 <p><code>BATCH_PARAM_OPT = 0</code> 的 sqllog 截图
-<img src="/database/batch-param-opt-18.png" alt="alt text">
+<img src="attachments/batch-param-opt-18.png" alt="alt text">
 <code>BATCH_PARAM_OPT = 1</code> 的 sqllog 截图
-<img src="/database/batch-param-opt-19.png" alt="alt text">
+<img src="attachments/batch-param-opt-19.png" alt="alt text">
 <code>BATCH_PARAM_OPT = 2</code> 的 sqllog 截图
-<img src="/database/batch-param-opt-20.png" alt="alt text"></p>
+<img src="attachments/batch-param-opt-20.png" alt="alt text"></p>
 <p>三种取值的柱状图如下
-<img src="/database/batch-param-opt-21.png" alt="alt text"></p>
+<img src="attachments/batch-param-opt-21.png" alt="alt text"></p>
 <blockquote>
 <p>[!WARNING]</p>
 <ol>
@@ -397,9 +397,9 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 <li>如果 where 条件是非等值条件，则不能优化；（批量绑定中，会对同一行反复更新，后一次更新会依赖前一次更新，所以不能优化）<code>update users set a = a+1 where b &gt; ?</code></li>
 </ol>
 </blockquote>
-<p><img src="/database/batch-param-opt-22.png" alt="alt text">
+<p><img src="attachments/batch-param-opt-22.png" alt="alt text">
 <code>update users set a = b+1 where a = ?</code> 无法优化。
-<img src="/database/batch-param-opt-23.png" alt="alt text">
+<img src="attachments/batch-param-opt-23.png" alt="alt text">
 <code>update users set a = a+1 where b &gt; ?</code> 确实无法优化。</p>
 <h4 id="存在唯一索引的情况">存在唯一索引的情况</h4>
 <p>创建如下唯一索引</p>
@@ -411,24 +411,24 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 <li><code>BATCH_PARAM_OPT = 2</code> 的执行时间为 52973ms；</li>
 </ul>
 <p><code>BATCH_PARAM_OPT = 0</code> 的 sqllog 截图
-<img src="/database/batch-param-opt-24.png" alt="alt text">
+<img src="attachments/batch-param-opt-24.png" alt="alt text">
 <code>BATCH_PARAM_OPT = 1</code> 的 sqllog 截图
 执行计划为
-<img src="/database/batch-param-opt-25.png" alt="alt text">
+<img src="attachments/batch-param-opt-25.png" alt="alt text">
 速度为
-<img src="/database/batch-param-opt-26.png" alt="alt text">
+<img src="attachments/batch-param-opt-26.png" alt="alt text">
 此时测试一下 100w 不带唯一索引的速度
-<img src="/database/batch-param-opt-27.png" alt="alt text">
+<img src="attachments/batch-param-opt-27.png" alt="alt text">
 其实非常近似，执行计划为
-<img src="/database/batch-param-opt-28.png" alt="alt text">
+<img src="attachments/batch-param-opt-28.png" alt="alt text">
 所以可以发现，带不带唯一索引其实对 <code>BATCH_PARAM_OPT = 1</code> 的执行计划<del>没有关系</del>，所以执行时间非常近似。
 其实也有一些关系，当把索引改成全列索引时，就会走 <code>SSCN</code>，从而减少扫描页数来优化执行速度。
-<img src="/database/batch-param-opt-29.png" alt="alt text">
-<img src="/database/batch-param-opt-30.png" alt="alt text">
+<img src="attachments/batch-param-opt-29.png" alt="alt text">
+<img src="attachments/batch-param-opt-30.png" alt="alt text">
 <code>BATCH_PARAM_OPT = 2</code> 的 sqllog 截图
-<img src="/database/batch-param-opt-31.png" alt="alt text">
+<img src="attachments/batch-param-opt-31.png" alt="alt text">
 三种取值的柱状图如下
-<img src="/database/batch-param-opt-32.png" alt="alt text"></p>
+<img src="attachments/batch-param-opt-32.png" alt="alt text"></p>
 <h3 id="delete-测试"><code>DELETE</code> 测试</h3>
 <p>表结构同上，同样插入上面的 100w 数据。<code>DELETE</code> SQL 如下</p>
 <div class="highlight"><pre tabindex="0" style="background-color:#fff;-moz-tab-size:2;-o-tab-size:2;tab-size:2;"><code class="language-sql" data-lang="sql"><span style="display:flex;"><span><span style="font-weight:bold">delete</span> <span style="font-weight:bold">from</span> users <span style="font-weight:bold">where</span> a = ? <span style="font-weight:bold">and</span> b = ? <span style="font-weight:bold">and</span> <span style="font-weight:bold">c</span> = ? <span style="font-weight:bold">and</span> d = ?
@@ -441,16 +441,16 @@ insert into users values ( ?, ?, ?, ? ); BATCH_PARAM_OPT = 0 时候的计划 BAT
 <li><code>BATCH_PARAM_OPT = 2</code> 的执行时间为 16954ms；</li>
 </ul>
 <p><code>BATCH_PARAM_OPT = 0</code> 的 sqllog 的截图
-<img src="/database/batch-param-opt-33.png" alt="alt text">
-<img src="/database/batch-param-opt-34.png" alt="alt text">
+<img src="attachments/batch-param-opt-33.png" alt="alt text">
+<img src="attachments/batch-param-opt-34.png" alt="alt text">
 <code>BATCH_PARAM_OPT = 1</code> 的 sqllog 的截图
-<img src="/database/batch-param-opt-35.png" alt="alt text">
-<img src="/database/batch-param-opt-36.png" alt="alt text">
+<img src="attachments/batch-param-opt-35.png" alt="alt text">
+<img src="attachments/batch-param-opt-36.png" alt="alt text">
 <code>BATCH_PARAM_OPT = 2</code> 的 sqllog 的截图
-<img src="/database/batch-param-opt-37.png" alt="alt text">
-<img src="/database/batch-param-opt-38.png" alt="alt text">
+<img src="attachments/batch-param-opt-37.png" alt="alt text">
+<img src="attachments/batch-param-opt-38.png" alt="alt text">
 三种取值的柱状图如下
-<img src="/database/batch-param-opt-39.png" alt="alt text"></p>
+<img src="attachments/batch-param-opt-39.png" alt="alt text"></p>
 
         </div>
 
