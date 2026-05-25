@@ -47,10 +47,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Depends on**: Phase 2
 **Requirements**: CONT-03, SEO-01, SEO-02
 **Success Criteria** (what must be TRUE):
-  1. 四个分类各有至少一篇真实文章，内容具有实际参考价值
+  1. 至少 1–2 篇示例文章，分类标注正确（D-04 放宽了原 ROADMAP 要求）
   2. 每篇文章页面的 HTML `<head>` 中有 og:title 和 og:description 标签
   3. `bun run build` 后 public/ 目录中存在 sitemap.xml
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 03-01-PLAN.md — 创建两篇分类示例文章并确认 Open Graph 配置（CONT-03, SEO-01）
+- [ ] 03-02-PLAN.md — 安装 hexo-generator-sitemap 并验证构建输出（SEO-02）
 
 ### Phase 4: 自动部署
 **Goal**: 推送代码到 main 分支后博客自动构建并发布到 GitHub Pages
@@ -71,5 +74,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. 仓库基础 | 0/? | Not started | - |
 | 2. 主题与内容结构 | 0/? | Not started | - |
-| 3. 内容与 SEO | 0/? | Not started | - |
+| 3. 内容与 SEO | 0/2 | Not started | - |
 | 4. 自动部署 | 0/? | Not started | - |
