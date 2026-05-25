@@ -6,3 +6,5 @@ node_modules/
 public/
 .deploy*/
 _multiconfig.yml
+# .planning is intentionally tracked for GSD workflow
+
