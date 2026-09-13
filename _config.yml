@@ -4,9 +4,9 @@
 
 # Site
 title: guangluo's blog
-subtitle: ""
-description: ""
-keywords:
+subtitle: "Code change the world?"
+description: "A blog about database administration and development."
+keywords: dba, database, development
 author: Guang Luo
 language: zh-CN
 
@@ -40,7 +40,7 @@ external_link:
   exclude: ""
 filename_case: 0
 render_drafts: false
-post_asset_folder: false
+post_asset_folder: true
 relative_link: false
 future: true
 syntax_highlighter: highlight.js
@@ -54,6 +54,9 @@ prismjs:
   preprocess: true
   line_number: true
   tab_replace: ""
+marked:
+  prependRoot: true
+  postAsset: true
 
 # Home page setting
 # path: Root path for your blogs index page. (default = '')
