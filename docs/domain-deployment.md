@@ -85,7 +85,7 @@ Direct Upload 项目后续可使用 Wrangler 和 GitHub Actions 自动部署。C
 
 ## 搜索引擎收录
 
-2026-10-17 实测：站点首次发布（2026-10-16）次日，Google 与百度都还没收录。搜狗、360、Bing、Brave 的 `site:` 查询均为 0 条，站长之家和爱站也查不到数据。抓取侧是正常的：`robots.txt` 放行全部主流爬虫，`sitemap.xml` 有 23 条 URL，用 Googlebot 和 Baiduspider 的 UA 请求首页与文章页都返回 200。缺的是主动提交，以及指向本站的外链。
+2026-10-17 实测：站点首次发布（2026-10-16）次日，Google 与百度都还没收录。搜狗、360、Bing、Brave 的 `site:` 查询均为 0 条，站长之家和爱站也查不到数据。抓取侧是正常的：`robots.txt` 对搜索引擎放行（策略是默认拒绝，只放行搜索引擎 + 社交预览 + RSS 阅读器 + 网页存档，见 [README 的抓取策略一节](../README.md#抓取策略robotstxt)），`sitemap.xml` 有 23 条 URL，用 Googlebot 和 Baiduspider 的 UA 请求首页与文章页都返回 200。缺的是主动提交，以及指向本站的外链。上线后如果要真正拦住不遵守 robots.txt 的 AI 采集器，需要在 Cloudflare 侧开 AI Crawl Control 或加 WAF 规则。
 
 仓库已把提交做成配置项，只有填了值才会产生输出：
 
