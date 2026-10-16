@@ -181,15 +181,25 @@ rm -f /etc/nginx/sites-enabled/default
 
 # ---------------------------------------------------------------------------
 # 2. 配置模板（__XXX__ 占位符用 sed 替换，避免在 heredoc 里转义 nginx 的 $ 变量）
+#
+# 只生成**一份**配置，它同时照顾两种访问方式：
+#   · 按域名访问（备案通过、解析切到本机之后）：80 上 301 到 HTTPS，443 上提供服务；
+#   · 用 IP 直连（备案前的主要入口）：80 的默认站点直接给内容，443 也能连
+#     （证书是签给域名的，浏览器用 IP 访问会提示名字不匹配，这是预期内的；
+#      想干净地验证书链就用 curl --resolve blog.guangluo.top:443:<IP>）。
+# 这样就不存在「先装 HTTP 配置、备案后再换成 HTTPS 配置」的两套状态，
+# 也就没有「备案后忘了切」这个坑。
 # ---------------------------------------------------------------------------
-write_bootstrap_config() {
+
+# 80 的默认站点：凡是不匹配下面那些域名 server_name 的请求（也就是用 IP 直连）
+# 都落在这里，直接把站点内容给出去。
+write_http_default_block() {
   cat <<'NGINX'
-# 证书签发前使用的配置：只监听 80，直接提供站点内容。
-# 由 deploy/server-setup.sh 安装；签发证书成功后会被正式配置替换。
+# HTTP 默认站点：用 IP 直连时走这里，直接提供站点内容
 server {
-    listen 80;
-    listen [::]:80;
-    server_name __SERVER_NAMES__;
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
 
     root __SITE_ROOT__;
     index index.html;
@@ -216,9 +226,16 @@ server {
 NGINX
 }
 
-write_https_config() {
+# 按域名访问时走的那个 80 站点，两种形态：
+#   redirect —— 主域名证书已就位：除两家证书验证路径外全部 301 到 HTTPS
+#   serve    —— 还没有证书：直接提供内容，免得把人跳到一个还不存在的 HTTPS 上
+# 两家的验证路径必须留在 301 之前（location / 里的 return 才管得到其余请求），
+# 否则 certbot 的 HTTP-01 和腾讯云的文件验证都会被自己 301 掉。
+write_http_domain_block() {
+  local mode="$1"
   cat <<'NGINX'
-# HTTP：只做三件事——转发两家的域名验证请求，其余全部 301 到 HTTPS。
+
+# HTTP：按域名访问
 server {
     listen 80;
     listen [::]:80;
@@ -229,22 +246,38 @@ server {
         default_type "text/plain";
     }
 
-    # 腾讯云免费证书的文件验证路径。证书续期时 workflow 会把验证文件放进来，
-    # 所以这条在 80 端口的「全部 301」之前必须保留。
     location ^~ /.well-known/pki-validation/ {
         root __PKI_ROOT__;
         default_type "text/plain";
     }
+NGINX
+  if [ "$mode" = redirect ]; then
+    printf '\n    location / {\n        return 301 https://%s$request_uri;\n    }\n}\n' "$DOMAIN"
+  else
+    cat <<'NGINX'
+
+    root __SITE_ROOT__;
+    index index.html;
 
     location / {
-        return 301 https://__DOMAIN__$request_uri;
+        try_files $uri $uri/index.html $uri/ =404;
     }
+
+    error_page 404 /404.html;
 }
+NGINX
+  fi
+}
+
+# HTTPS 主站。同时是 443 的默认站点，所以用 IP 或未知 SNI 访问会落到这里
+# （浏览器会提示证书名字不匹配，但连接是通的，`curl -k https://<IP>/` 能拿到页面）。
+write_https_main_block() {
+  cat <<'NGINX'
 
 # HTTPS：主站
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
     http2 on;                       # 需要 nginx >= 1.25.1，Debian 13 自带 1.26
     server_name __DOMAIN__;
 
@@ -301,14 +334,15 @@ NGINX
 
 # 备用域名统一 301 到主站，避免搜索引擎把同一个站点分别收录。
 # 一个域名一个 server 块（腾讯云免费证书是单域名，每家一份证书目录），
-# 所以这里按域名逐个生成；证书还没到位的域名先不上 443，只保留 80 端口的 301。
-# 注意 __ALIAS__ 是在循环里就地替换的（每个块的值都不一样），
+# 所以这里按域名逐个生成；证书还没到位、或者手上这份证书不覆盖这个域名的，先不上 443，
+# 只在 80 端口按域名 301（那台站点的 80 块会把它转到主站）。
+# 注意 __ALIAS__ 和 __CERT_DIR__ 是在循环里就地替换的（每个块的值都不一样），
 # 其余占位符仍然由下面的 fill_placeholders 统一处理。
 write_https_alias_blocks() {
   local alias cert_dir
   for alias in $ALIASES; do
     if ! cert_dir=$(cert_dir_for "$alias"); then
-      warn "$alias 还没有证书，暂时只在 80 端口做 301（拿到证书后重跑本脚本即可上 443）"
+      warn "$alias 还没有证书，暂时只在 80 端口 301（拿到证书后重跑本脚本即可上 443）"
       continue
     fi
     if ! cert_covers "$cert_dir" "$alias"; then
@@ -344,7 +378,6 @@ fill_placeholders() {
 
 # 装上配置并用 nginx -t 校验；校验失败就回滚到上一份，绝不让 nginx 起不来
 install_config() {
-  local builder="$1"
   local backup=''
   local target
   target=$(mktemp)
@@ -352,8 +385,14 @@ install_config() {
   # 这里必须用 if，不能写 `[ … ] && [ … ] && func`：后者在条件不成立时返回 1，
   # 作为管道的最后一条命令会被 set -e 判成失败，脚本会静默退出。
   {
-    "$builder"
-    if [ -n "$ALIASES" ] && [ "$builder" = write_https_config ]; then
+    write_http_default_block
+    if [ -n "$MAIN_CERT_DIR" ]; then
+      write_http_domain_block redirect
+      write_https_main_block
+    else
+      write_http_domain_block serve
+    fi
+    if [ -n "$ALIASES" ]; then
       write_https_alias_blocks
     fi
   } | fill_placeholders > "$target"
@@ -426,34 +465,15 @@ done
 # ---------------------------------------------------------------------------
 # 4. 装配置
 #
-# 上 HTTPS 配置有两个条件：主域名有证书，**并且**域名已经指向本机。
-# 两种来源的「有证书」都落在 $CERT_BASE/$DOMAIN/fullchain.pem 上，所以这里不用分来源。
-#
-# 为什么要看解析：腾讯云免费证书可以在备案通过前就签好。那时候域名还没资格指向
-# 大陆机器，站点得靠 IP 直接访问；要是这时就装上「HTTP 全部 301 到 https://域名」的
-# 正式配置，用 IP 访问会被跳到一个还不通的地方，等于把备案前的入口弄没了。
-# 所以证书先放着，等域名真的指过来（备案通过、Cloudflare 改灰云）再上 HTTPS。
-# letsencrypt 那条路不受影响：证书本来就是解析到位之后才签得出来的。
+# 只装一份自适应配置（见第 2 节）：主域名证书在不在，决定的是「按域名访问时
+# 80 端口是 301 还是直接提供内容」，以及 443 上有没有站点；
+# 用 IP 直连的请求永远落在 80 的默认站点上，直接把内容给出去——
+# 所以备案前不需要为了保住 IP 入口而放弃 HTTPS，也不需要备案后再换一套配置。
+# 两种证书来源的「有证书」都落在 $CERT_BASE/$DOMAIN/fullchain.pem 上，这里不用分来源。
 # ---------------------------------------------------------------------------
 MAIN_CERT_DIR=''
 MAIN_CERT_DIR=$(cert_dir_for "$DOMAIN" || true)
-
-# 探测不到本机公网 IP 时没法判断解析，就按「已指向」处理：
-# 宁可上 HTTPS，也别因为认不出 IP 把站点一直按在 HTTP 上。
-DOMAIN_POINTS_HERE=1
-if [ -n "$SERVER_IP" ] && ! resolves_here "$DOMAIN"; then
-  DOMAIN_POINTS_HERE=0
-fi
-
-if [ -n "$MAIN_CERT_DIR" ] && [ "$DOMAIN_POINTS_HERE" -eq 1 ]; then
-  install_config write_https_config
-else
-  install_config write_bootstrap_config
-  if [ -n "$MAIN_CERT_DIR" ]; then
-    warn "$DOMAIN 还没指向本机${SERVER_IP:+（本机公网 IP：$SERVER_IP）}，证书先放着，配置保持 HTTP。"
-    warn "这样备案通过前还能直接用 IP 访问；等解析切到本机后重跑本脚本，或者跑一次 renew-server-cert 并勾上 refresh，就会自动切到 HTTPS。"
-  fi
-fi
+install_config
 
 # ---------------------------------------------------------------------------
 # 4.5 域名是否真的指向本机：直接探一次 ACME 路径
@@ -489,8 +509,13 @@ if [ "$CERT_SOURCE" = tencent ]; then
   # 本脚本只负责把 /etc/nginx/ssl/<域名>/ 里的证书接进 Nginx 配置。
   if [ -n "$MAIN_CERT_DIR" ]; then
     log "已装好证书：$MAIN_CERT_DIR（续期由 GitHub Actions 的 renew-server-cert 负责）"
+    if ! resolves_here "$DOMAIN"; then
+      warn "$DOMAIN 还没指向本机${SERVER_IP:+（本机公网 IP：$SERVER_IP）}，所以现在别指望 https://$DOMAIN 能用。"
+      warn "备案前用 IP 直连就行：http://${SERVER_IP:-<公网IP>}/ 直接给页面，https://${SERVER_IP:-<公网IP>}/ 也能连（浏览器会提示证书是发给 $DOMAIN 的）。"
+      warn "想干净地验证书链：curl --resolve $DOMAIN:443:${SERVER_IP:-<公网IP>} https://$DOMAIN/"
+    fi
   else
-    warn "还没有 $DOMAIN 的证书，站点暂时只走 HTTP。"
+    warn "还没有 $DOMAIN 的证书，443 先不开，站点只走 HTTP（用 IP 直连访问正常）。"
     warn '先跑一次 renew-server-cert 工作流（或本地 node tools/ssl-renew.mjs），把证书装进 /etc/nginx/ssl/，再重跑本脚本。'
   fi
 elif [ "$SKIP_CERT" -eq 1 ]; then
@@ -509,8 +534,8 @@ else
   for host in $SERVER_NAMES; do certbot_args+=(-d "$host"); done
 
   if certbot "${certbot_args[@]}"; then
-    log '证书签发成功，切换到 HTTPS 配置'
-    install_config write_https_config
+    log '证书签发成功，重新生成配置（80 端口切到 301、443 上开始服务）'
+    install_config
   else
     warn '证书签发失败（通常是解析还没生效或 80 端口被安全组挡住）。'
     warn '站点暂以 HTTP 提供，排查后重新运行本脚本即可，其他步骤都已就绪。'
@@ -535,6 +560,8 @@ cat <<EOF
   证书来源     $CERT_SOURCE
   证书根目录   $CERT_BASE${MAIN_CERT_DIR:+（$DOMAIN 用 $MAIN_CERT_DIR）}
   本机公网 IP  ${SERVER_IP:-未能自动识别，以腾讯云控制台显示的为准}
+  当前入口     http://${SERVER_IP:-<公网IP>}/（IP 直连，任何时候都通）
+               ${MAIN_CERT_DIR:+https://${SERVER_IP:-<公网IP>}/（能连，浏览器会提示证书名字不匹配）}
 
 接下来：
   1. 腾讯云控制台 → 安全组 → 放行 22 / 80 / 443
