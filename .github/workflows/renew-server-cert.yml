@@ -1,0 +1,213 @@
+name: Renew mainland server certificate
+
+# 腾讯云免费 DV 证书（TrustAsia C1，单域名、3 个月）的自动续期。
+#
+# 为什么需要它：腾讯云的「证书自动部署」只覆盖它自家的云产品（CLB / CDN / DNSPod），
+# 管不到 ECS 上自建的 Nginx；免费证书又是 3 个月一到期，手工换很容易忘。
+# 这条工作流把「申请 → 在 Cloudflare 加 DNS 验证记录 → 下载 → 装上服务器 → 重写 Nginx 配置」
+# 整条链路跑完。证书逻辑在 tools/ssl-renew.mjs，安装逻辑在 deploy/install-cert.sh，
+# 配置由 deploy/server-setup.sh 重写（它自带 nginx -t 校验和回滚）。
+#
+# 开关：仓库变量 SERVER_CERT_RENEW=true。不是 true 时整个任务跳过，
+# 所以在密钥、Token 和服务器都准备好之前，这条工作流不会让 CI 变红。
+#
+# Settings → Secrets and variables → Actions：
+#   Variables SERVER_CERT_RENEW = true；可选 SERVER_CERT_THRESHOLD_DAYS（默认 21）
+#   Secrets   TENCENT_SECRET_ID / TENCENT_SECRET_KEY（腾讯云 CAM 密钥）
+#             CLOUDFLARE_DNS_TOKEN（Cloudflare Token，权限 Zone → DNS → Edit）
+#             SERVER_HOST / SERVER_USER / SERVER_SSH_KEY（与发布通道共用）
+#             可选 SERVER_PORT（默认 22）
+#
+# 时间：cron 用 UTC。每周一 02:00 UTC = 每周一 10:00 北京时间。
+# 每次跑都先看剩余天数，只有快到期（默认剩不到 21 天）才真的申请——
+# 腾讯云免费证书有配额，不能天天去申请一张新的。
+#
+# 完整步骤见 docs/mainland-hosting.md 的「证书」一节。
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 不管剩余天数，强制重新申请一张
+        type: boolean
+        default: false
+      refresh:
+        description: 只重写 Nginx 配置（证书不用换；备案后切 HTTPS 用这个）
+        type: boolean
+        default: false
+      check:
+        description: 只检查剩余天数，不申请、不改服务器
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renew-server-cert
+  cancel-in-progress: false
+
+jobs:
+  renew:
+    if: vars.SERVER_CERT_RENEW == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment:
+      name: mainland-server
+      url: https://blog.guangluo.top
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
+      SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+      TENCENT_SECRET_ID: ${{ secrets.TENCENT_SECRET_ID }}
+      TENCENT_SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
+      CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_DNS_TOKEN }}
+      STAGING_PATH: /var/www/cert-staging
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.3'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check configuration
+        run: |
+          missing=0
+          for name in SERVER_HOST SERVER_USER SERVER_SSH_KEY TENCENT_SECRET_ID TENCENT_SECRET_KEY CLOUDFLARE_DNS_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::缺少仓库 Secret：$name（见 docs/mainland-hosting.md 的证书一节）"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Ask Tencent Cloud which certificates are about to expire
+        id: plan
+        run: |
+          set -uo pipefail
+          args=(--json)
+          if [ "${{ inputs.force }}" = "true" ]; then args+=(--force); fi
+          if [ "${{ inputs.check }}" = "true" ]; then args+=(--check); fi
+          if [ -n "${{ vars.SERVER_CERT_THRESHOLD_DAYS }}" ]; then
+            args+=(--threshold "${{ vars.SERVER_CERT_THRESHOLD_DAYS }}")
+          fi
+          # 某个域名失败时脚本退出码是 1，但计划（JSON）照样会输出：先把成功的装上，
+          # 失败的留到最后一步统一报红，不因为一个域名把另外两个白签一遍。
+          node tools/ssl-renew.mjs "${args[@]}" > .cert-plan.json || status=$?
+          if [ ! -s .cert-plan.json ]; then
+            echo "::error::ssl-renew.mjs 没有输出计划（退出码 ${status:-0}），看上面的日志"
+            exit 1
+          fi
+          node -e '
+            const plan = JSON.parse(require("node:fs").readFileSync(".cert-plan.json", "utf8"));
+            const lines = plan.domains.map(d =>
+              `| \`${d.domain}\` | ${d.action} | ${d.daysLeft ?? "-"} | ${d.certificateId ? `\`${d.certificateId}\`` : "-"} |`);
+            const summary = [
+              "### 证书续期",
+              "",
+              `| 域名 | 动作 | 剩余天数 | 证书 ID |`,
+              `| --- | --- | --- | --- |`,
+              ...lines,
+              ""
+            ].join("\n");
+            require("node:fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+            console.log(summary);
+            for (const d of plan.domains) {
+              if (d.error) console.log(`::warning::${d.domain}：${d.error}`);
+            }
+            require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, `renewed=${plan.renewed.join(" ")}\n`);
+            require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, `failed=${plan.failed.join(" ")}\n`);
+            require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, `domains=${plan.domains.map(d => d.domain).join(" ")}\n`);
+          '
+
+      - name: Install SSH key
+        if: steps.plan.outputs.renewed != '' || inputs.refresh == true
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          test -s ~/.ssh/known_hosts || {
+            echo "::error::无法读取 $SERVER_HOST:$SERVER_PORT 的 SSH 主机公钥，确认安全组已放行 22 端口。"
+            exit 1
+          }
+
+      # 一个域名一张免费证书（免费证书是单域名，不能像 Let's Encrypt 那样一张带三个 SAN），
+      # 所以这里逐个域名：先 rsync 到服务器上的暂存目录，再由 install-cert.sh 原子换进
+      # /etc/nginx/ssl/<域名>/——换完跑 nginx -t，不通过就回滚，不会把线上打挂。
+      - name: Install certificates on the server
+        if: steps.plan.outputs.renewed != ''
+        run: |
+          set -euo pipefail
+          for domain in ${{ steps.plan.outputs.renewed }}; do
+            echo "::group::$domain"
+            ssh -p "$SERVER_PORT" -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
+              "$SERVER_USER@$SERVER_HOST" "mkdir -p '$STAGING_PATH/$domain'"
+            rsync --archive --delete --human-readable \
+              -e "ssh -p $SERVER_PORT -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes" \
+              ".cert-out/$domain/" "$SERVER_USER@$SERVER_HOST:$STAGING_PATH/$domain/"
+            ssh -p "$SERVER_PORT" -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
+              "$SERVER_USER@$SERVER_HOST" 'bash -s' -- --domain "$domain" --src "$STAGING_PATH/$domain" \
+              < deploy/install-cert.sh
+            ssh -p "$SERVER_PORT" -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
+              "$SERVER_USER@$SERVER_HOST" "rm -rf '$STAGING_PATH/$domain'"
+            echo "::endgroup::"
+          done
+
+      # 证书换好了，但 Nginx 配置里引用的路径要跟着更新（首次申请时还要从「只走 HTTP」
+      # 切到「HTTP 301 + HTTPS」）。这一步复用初始化脚本，它的 nginx -t 校验和回滚同样生效。
+      # 勾 refresh 也会走到这里：备案通过、解析切到本机之后，靠它把配置切到 HTTPS
+      # （在那之前脚本自己会判断域名还没指过来，继续用 HTTP + IP 直连，不会把入口弄没）。
+      - name: Refresh the Nginx configuration
+        if: steps.plan.outputs.renewed != '' || inputs.refresh == true
+        run: |
+          ssh -p "$SERVER_PORT" -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
+            "$SERVER_USER@$SERVER_HOST" 'bash -s' -- --cert-source tencent --owner "$SERVER_USER" \
+            < deploy/server-setup.sh
+
+      # 对一次线上证书指纹。**对不上只告警不报红**：备案通过前域名还指向 Cloudflare Pages，
+      # 443 上当然是别人的证书，这不是失败。真正的保证在服务器那一侧——
+      # install-cert.sh 校验过域名与私钥、跑过 nginx -t，失败会回滚并让 job 变红。
+      - name: Compare the served certificate (informational)
+        if: steps.plan.outputs.renewed != '' || inputs.refresh == true
+        run: |
+          set -uo pipefail
+          # 换过证书的域名才比指纹；只勾 refresh 时本地没有新证书，就只报告线上发的是什么。
+          compare="${{ steps.plan.outputs.renewed }}"
+          if [ -z "$compare" ]; then compare="${{ steps.plan.outputs.domains }}"; fi
+          for domain in $compare; do
+            served=$(echo | openssl s_client -connect "$domain:443" -servername "$domain" 2>/dev/null \
+              | openssl x509 -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2 || true)
+            if [ -z "$served" ]; then
+              echo "::notice::$domain 在 443 上拿不到证书（还没切解析、或 443 未放行），跳过指纹比对"
+              continue
+            fi
+            if [ ! -f ".cert-out/$domain/fullchain.pem" ]; then
+              echo "::notice::$domain 443 上正在发：$served（本次没换证书，没有本地副本可比）"
+              continue
+            fi
+            expected=$(openssl x509 -in ".cert-out/$domain/fullchain.pem" -noout -fingerprint -sha256 | cut -d= -f2)
+            if [ "$served" = "$expected" ]; then
+              echo "$domain 线上证书就是刚装的那一份（${served}）"
+            else
+              echo "::warning::$domain 443 上发的证书不是这台机器装的（线上 ${served}，本机 ${expected}）。备案前域名还指向 Cloudflare 时这是正常的；备案切解析之后还这样，就检查 Cloudflare 的橙云代理是不是没关。"
+            fi
+          done
+
+      # 有域名没续成，job 就红：这一步放在最后，是为了让成功的域名先把证书装上。
+      - name: Fail if any domain failed
+        if: steps.plan.outputs.failed != ''
+        run: |
+          echo "::error::这些域名没有续期成功：${{ steps.plan.outputs.failed }}"
+          exit 1

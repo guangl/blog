@@ -6,6 +6,9 @@ node_modules/
 public/
 public-domain/
 .wrangler/
+# 证书续期任务的产物：.cert-out/ 里是私钥，绝不能提交；.cert-plan.json 是那次运行的计划
+.cert-out/
+.cert-plan.json
 source/_data/caches/
 .deploy*/
 _multiconfig.yml

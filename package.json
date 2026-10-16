@@ -18,6 +18,8 @@
     "server:domain": "hexo server --config _config.yml,_config.domain.yml --port 4001",
     "seo:ping": "node tools/ping-search.mjs _config.domain.yml",
     "seo:ping:dry": "node tools/ping-search.mjs _config.domain.yml --dry-run",
+    "cert:check": "node tools/ssl-renew.mjs --check",
+    "cert:renew": "node tools/ssl-renew.mjs",
     "favicon": "node tools/make-favicon.mjs",
     "images:compress": "node tools/optimize-images.mjs --write",
     "images:report": "node tools/optimize-images.mjs",
@@ -46,6 +48,7 @@
     "cheerio": "^1.2.0",
     "exifr": "^7.1.3",
     "js-yaml": "^4.1.1",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "tencentcloud-sdk-nodejs-ssl": "4.1.281"
   }
 }
