@@ -191,9 +191,29 @@ bunx hexo stellar new note --notebook dba --title "标题" --tags "postgresql/�
 
 另外，主题默认的 `fallbacks.cover` / `link_card` 指向**主题作者 CDN 的占位图**（`gcore.jsdelivr.net/gh/cdn-x/placeholder`）。本站已把 `cover` 换成自己的图；`link_card` 未配置，因为站点目前没有用到链接卡片类标签。自检会检查页面里不再出现该 CDN。
 
+### 抓取策略（robots.txt）
+
+`source/robots.txt` 是**默认拒绝**：`User-agent: *` 落 `Disallow: /`，只显式放行三类别例外之外的搜索引擎。分组按 robots.txt 的最长匹配生效，命中了具名组的爬虫走自己的规则，其余全部落到 `*`。
+
+| 分区 | 放行对象 |
+| --- | --- |
+| 搜索引擎 | Googlebot、Bingbot、Baiduspider、Sogou web spider、360Spider / HaosouSpider、YisouSpider、Applebot、DuckDuckBot、YandexBot、Slurp、MojeekBot、Qwantify、SeznamBot、Yeti、Brave |
+| 社交链接预览 | Twitterbot、facebookexternalhit / Facebot、TelegramBot、Discordbot、Slackbot、WhatsApp、LinkedInBot、Pinterestbot、redditbot、Embedly、SkypeUriPreview、cardyb |
+| RSS 阅读器 | Feedly、Inoreader、NewsBlur、Feedbin、BazQux Reader、The Old Reader、Miniflux、FreshRSS、Tiny Tiny RSS、NetNewsWire、Reeder、newsboat、Akregator、Feedspot |
+| 网页存档 | ia_archiver、archive.org_bot |
+
+AI 训练与数据采集（GPTBot、OAI-SearchBot、ClaudeBot、CCBot、PerplexityBot、Bytespider、Amazonbot、meta-externalagent 等）和 SEO 工具（AhrefsBot、SemrushBot、MJ12bot、DotBot 等）都显式写 `Disallow: /`。`Google-Extended`、`Applebot-Extended` 不是爬虫，是关闭对应 AI 训练用途的开关，拒绝它们不影响 Googlebot / Applebot 的搜索抓取。
+
+两点必须知道：
+
+1. **robots.txt 只是约定**。不遵守它的采集器照样抓取，要真正拦住得在 Cloudflare 侧开 AI Crawl Control 或加 WAF 规则。
+2. **自建 RSS 阅读器可能用自己的 UA**，会落到默认的 `Disallow: /`。遇到订阅失败，在阅读器分区补一行它的 UA 即可。
+
+`tools/check-site.mjs` 会自检策略没被改回全站放行：`User-agent: *` 必须是 `Disallow: /`，Googlebot / Bingbot / Baiduspider 必须 `Allow: /`。
+
 ### 搜索引擎收录
 
-2026-10-17 实测：站点首次发布次日，Google 与百度都还没收录；搜狗、360、Bing、Brave 和站长工具查询同样是 0 条。抓取侧没有问题（`robots.txt` 放行、`sitemap.xml` 有全部页面、Googlebot 和 Baiduspider 的 UA 都拿到 200），缺的是**主动提交**。仓库已经把提交做成配置项：
+2026-10-17 实测：站点首次发布次日，Google 与百度都还没收录；搜狗、360、Bing、Brave 和站长工具查询同样是 0 条。抓取侧没有问题（`robots.txt` 对搜索引擎放行、`sitemap.xml` 有全部页面、Googlebot 和 Baiduspider 的 UA 都拿到 200），缺的是**主动提交**。仓库已经把提交做成配置项：
 
 | 配置 | 位置 | 说明 |
 | --- | --- | --- |

@@ -1,15 +1,206 @@
-# 全部爬虫默认允许抓取。
+# 抓取策略：默认拒绝，只放行搜索引擎，外加社交链接预览、RSS 阅读器、网页存档三类例外。
+#
+# robots.txt 按「最长匹配」选组：UA 命中下面某个具名 User-agent 的爬虫走该组规则，
+# 没有命中的一律落进 `User-agent: *` 的 Disallow。新增搜索引擎时在搜索分区加一组即可。
+# 注意：robots.txt 是约定而非强制，不遵守它的采集器（部分 AI 爬虫）依然会抓取；
+# 要真正拦住，得在 Cloudflare 侧开 AI Crawl Control 或加 WAF 规则。
+
+# ---------------------------------------------------------------------------
+# 默认：拒绝所有未显式放行的爬虫（含各类 AI 训练与数据采集爬虫）
+# ---------------------------------------------------------------------------
 User-agent: *
+Disallow: /
+
+# ---------------------------------------------------------------------------
+# 搜索引擎：显式放行，便于站长平台核对抓取权限
+# ---------------------------------------------------------------------------
+User-agent: Googlebot
 Allow: /
 
-# 关注的搜索引擎显式放行，便于站长平台核对抓取权限。
-User-agent: Googlebot
+User-agent: Bingbot
 Allow: /
 
 User-agent: Baiduspider
 Allow: /
 
-User-agent: Bingbot
+User-agent: Sogou web spider
 Allow: /
+
+User-agent: 360Spider
+Allow: /
+
+User-agent: HaosouSpider
+Allow: /
+
+User-agent: YisouSpider
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: MojeekBot
+Allow: /
+
+User-agent: Qwantify
+Allow: /
+
+User-agent: SeznamBot
+Allow: /
+
+User-agent: Yeti
+Allow: /
+
+User-agent: Brave
+Allow: /
+
+# ---------------------------------------------------------------------------
+# 社交平台的链接预览：只取标题、摘要与封面，放行后分享才有卡片
+# ---------------------------------------------------------------------------
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Facebot
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+User-agent: Discordbot
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+User-agent: Slackbot-LinkExpanding
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Pinterestbot
+Allow: /
+
+User-agent: redditbot
+Allow: /
+
+User-agent: Embedly
+Allow: /
+
+User-agent: SkypeUriPreview
+Allow: /
+
+User-agent: cardyb
+Allow: /
+
+# ---------------------------------------------------------------------------
+# RSS / Atom 阅读器：保证订阅 atom.xml 的读者正常收到更新
+# 自建阅读器（如 FreshRSS、Miniflux）若用了自定义 UA，需要在这里补一行。
+# ---------------------------------------------------------------------------
+User-agent: Feedly
+Allow: /
+
+User-agent: Inoreader
+Allow: /
+
+User-agent: NewsBlur
+Allow: /
+
+User-agent: Feedbin
+Allow: /
+
+User-agent: BazQux Reader
+Allow: /
+
+User-agent: The Old Reader
+Allow: /
+
+User-agent: Miniflux
+Allow: /
+
+User-agent: FreshRSS
+Allow: /
+
+User-agent: Tiny Tiny RSS
+Allow: /
+
+User-agent: NetNewsWire
+Allow: /
+
+User-agent: Reeder
+Allow: /
+
+User-agent: newsboat
+Allow: /
+
+User-agent: Akregator
+Allow: /
+
+User-agent: Feedspot
+Allow: /
+
+# ---------------------------------------------------------------------------
+# 网页存档：Wayback Machine 等历史快照
+# ---------------------------------------------------------------------------
+User-agent: ia_archiver
+Allow: /
+
+User-agent: archive.org_bot
+Allow: /
+
+# ---------------------------------------------------------------------------
+# AI 训练与数据采集：显式拒绝。默认组已经覆盖，这里写明意图，
+# 也避免将来放宽 `User-agent: *` 时意外放行。
+# Google-Extended / Applebot-Extended 不是爬虫，是关闭对应 AI 训练用途的开关，
+# 拒绝它们不影响 Googlebot / Applebot 的搜索抓取。
+# ---------------------------------------------------------------------------
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: OAI-SearchBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: ClaudeBot
+User-agent: Claude-Web
+User-agent: anthropic-ai
+User-agent: CCBot
+User-agent: PerplexityBot
+User-agent: Bytespider
+User-agent: Amazonbot
+User-agent: meta-externalagent
+User-agent: meta-externalfetcher
+User-agent: FacebookBot
+User-agent: Diffbot
+User-agent: Omgilibot
+User-agent: ImagesiftBot
+User-agent: Timpibot
+User-agent: YouBot
+User-agent: cohere-ai
+User-agent: PetalBot
+Disallow: /
+
+# ---------------------------------------------------------------------------
+# SEO / 流量分析爬虫：不属于搜索引擎，一并拒绝
+# ---------------------------------------------------------------------------
+User-agent: AhrefsBot
+User-agent: SemrushBot
+User-agent: MJ12bot
+User-agent: DotBot
+User-agent: DataForSeoBot
+User-agent: BLEXBot
+Disallow: /
 
 Sitemap: https://blog.guangluo.top/sitemap.xml

@@ -145,7 +145,47 @@ sitemap('loc').each((_, element) => localTarget(sitemap(element).text(), site, '
 const sitemapUrls = sitemap('loc').toArray().map(element => sitemap(element).text().trim());
 report(sitemapUrls.length > 0, 'sitemap.xml has no URLs');
 report(sitemapUrls.includes(site.href), 'sitemap.xml is missing the homepage');
-report(readFileSync(resolve(output, 'robots.txt'), 'utf8').includes(new URL('sitemap.xml', site).href), 'robots.txt has wrong sitemap URL');
+const robotsText = readFileSync(resolve(output, 'robots.txt'), 'utf8');
+report(robotsText.includes(new URL('sitemap.xml', site).href), 'robots.txt has wrong sitemap URL');
+
+// robots.txt 的抓取策略：默认封禁、搜索引擎显式放行。改策略时这里的期望值要一起改。
+// 只做「组是否被整体封禁」的粗粒度判断，够用来拦住把策略改回全站放行的错误。
+function parseRobots(text) {
+  const groups = [];
+  let current = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/#.*$/, '').trim();
+    if (!line) continue;
+    const [rawKey, ...rest] = line.split(':');
+    const key = rawKey.trim().toLowerCase();
+    const value = rest.join(':').trim();
+    if (key === 'user-agent') {
+      // 连续多个 User-agent 属于同一组；已经写过规则则另起一组。
+      if (!current || current.rules.length > 0) {
+        current = { agents: [], rules: [] };
+        groups.push(current);
+      }
+      current.agents.push(value.toLowerCase());
+    } else if (current && (key === 'allow' || key === 'disallow')) {
+      current.rules.push({ key, value });
+    }
+  }
+  return groups;
+}
+
+const robotsGroups = parseRobots(robotsText);
+const robotsGroup = agent => robotsGroups.find(group => group.agents.includes(agent));
+const robotsBlocksAll = group => group.rules.some(rule => rule.key === 'disallow' && rule.value === '/');
+const robotsAllowsAll = group => group.rules.some(rule => rule.key === 'allow' && rule.value === '/');
+
+const defaultRobotsGroup = robotsGroup('*');
+report(!!defaultRobotsGroup && robotsBlocksAll(defaultRobotsGroup),
+  'robots.txt must block every crawler by default (User-agent: * / Disallow: /)');
+for (const agent of ['googlebot', 'bingbot', 'baiduspider']) {
+  const group = robotsGroup(agent);
+  report(!!group && robotsAllowsAll(group) && !robotsBlocksAll(group),
+    `robots.txt must allow the ${agent} search crawler`);
+}
 
 // 搜索引擎收录：站内只做“配置了就必须生效”的检查，没填的键不产生任何输出。
 // 百度搜索资源平台的那条验证等域名备案后再加进 seoMeta。
