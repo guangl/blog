@@ -1,4 +1,5 @@
-# 抓取策略：默认拒绝，只放行搜索引擎，外加社交链接预览、RSS 阅读器、网页存档三类例外。
+# 抓取策略：默认拒绝，只放行搜索引擎与 AI 搜索/用户触发抓取，外加社交链接预览、
+# RSS 阅读器、网页存档三类例外；AI 训练与数据采集、SEO 工具继续拒绝。
 #
 # robots.txt 按「最长匹配」选组：UA 命中下面某个具名 User-agent 的爬虫走该组规则，
 # 没有命中的一律落进 `User-agent: *` 的 Disallow。新增搜索引擎时在搜索分区加一组即可。
@@ -163,25 +164,48 @@ User-agent: archive.org_bot
 Allow: /
 
 # ---------------------------------------------------------------------------
+# AI 搜索与用户触发抓取：放行。
+# 这几组要么在为 AI 搜索建索引，要么是用户当下问到了本站、爬虫按需来取一页，
+# 结果是回答里带上引用、带来引荐流量，不涉及把内容收进训练集。
+# ---------------------------------------------------------------------------
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: meta-externalfetcher
+Allow: /
+
+# ---------------------------------------------------------------------------
 # AI 训练与数据采集：显式拒绝。默认组已经覆盖，这里写明意图，
 # 也避免将来放宽 `User-agent: *` 时意外放行。
+# 只放行上面的搜索/用户触发组、这里保持拒绝，等于「可以引用我，不要拿去训练」。
 # Google-Extended / Applebot-Extended 不是爬虫，是关闭对应 AI 训练用途的开关，
 # 拒绝它们不影响 Googlebot / Applebot 的搜索抓取。
 # ---------------------------------------------------------------------------
 User-agent: GPTBot
-User-agent: ChatGPT-User
-User-agent: OAI-SearchBot
-User-agent: Google-Extended
-User-agent: Applebot-Extended
 User-agent: ClaudeBot
 User-agent: Claude-Web
 User-agent: anthropic-ai
+User-agent: Google-Extended
+User-agent: Applebot-Extended
 User-agent: CCBot
-User-agent: PerplexityBot
 User-agent: Bytespider
 User-agent: Amazonbot
 User-agent: meta-externalagent
-User-agent: meta-externalfetcher
 User-agent: FacebookBot
 User-agent: Diffbot
 User-agent: Omgilibot

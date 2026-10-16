@@ -155,23 +155,24 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 
 ### 抓取策略（robots.txt）
 
-`source/robots.txt` 是**默认拒绝**：`User-agent: *` 落 `Disallow: /`，只显式放行三类别例外之外的搜索引擎。分组按 robots.txt 的最长匹配生效，命中了具名组的爬虫走自己的规则，其余全部落到 `*`。
+`source/robots.txt` 是**默认拒绝**：`User-agent: *` 落 `Disallow: /`，只显式放行下面这些例外。分组按 robots.txt 的最长匹配生效，命中了具名组的爬虫走自己的规则，其余全部落到 `*`。
 
 | 分区 | 放行对象 |
 | --- | --- |
 | 搜索引擎 | Googlebot、Bingbot、Baiduspider、Sogou web spider、360Spider / HaosouSpider、YisouSpider、Applebot、DuckDuckBot、YandexBot、Slurp、MojeekBot、Qwantify、SeznamBot、Yeti、Brave |
+| AI 搜索 / 用户触发抓取 | OAI-SearchBot、ChatGPT-User、Claude-SearchBot、Claude-User、PerplexityBot、Perplexity-User、meta-externalfetcher |
 | 社交链接预览 | Twitterbot、facebookexternalhit / Facebot、TelegramBot、Discordbot、Slackbot、WhatsApp、LinkedInBot、Pinterestbot、redditbot、Embedly、SkypeUriPreview、cardyb |
 | RSS 阅读器 | Feedly、Inoreader、NewsBlur、Feedbin、BazQux Reader、The Old Reader、Miniflux、FreshRSS、Tiny Tiny RSS、NetNewsWire、Reeder、newsboat、Akregator、Feedspot |
 | 网页存档 | ia_archiver、archive.org_bot |
 
-AI 训练与数据采集（GPTBot、OAI-SearchBot、ClaudeBot、CCBot、PerplexityBot、Bytespider、Amazonbot、meta-externalagent 等）和 SEO 工具（AhrefsBot、SemrushBot、MJ12bot、DotBot 等）都显式写 `Disallow: /`。`Google-Extended`、`Applebot-Extended` 不是爬虫，是关闭对应 AI 训练用途的开关，拒绝它们不影响 Googlebot / Applebot 的搜索抓取。
+**AI 分两类处理**（2026-10-17 调整）：AI 搜索与用户触发抓取放行——它们要么在为 AI 搜索建索引，要么是用户当下问到了本站、按需取一页，结果是回答里带引用、带来引荐流量；AI 训练与数据采集（GPTBot、ClaudeBot、CCBot、Bytespider、Amazonbot、meta-externalagent、cohere-ai 等）和 SEO 工具（AhrefsBot、SemrushBot、MJ12bot、DotBot 等）仍显式写 `Disallow: /`。也就是「可以引用我，不要拿去训练」。`Google-Extended`、`Applebot-Extended` 不是爬虫，是关闭对应 AI 训练用途的开关，拒绝它们不影响 Googlebot / Applebot 的搜索抓取。
 
 两点必须知道：
 
-1. **robots.txt 只是约定**。不遵守它的采集器照样抓取，要真正拦住得在 Cloudflare 侧开 AI Crawl Control 或加 WAF 规则。
+1. **robots.txt 只是约定**。不遵守它的采集器照样抓取，要真正拦住得在 Cloudflare 侧开 AI Crawl Control 或加 WAF 规则；反过来说，训练类爬虫的 `Disallow` 也只是表态，Cloudflare 侧不开规则就拦不住。
 2. **自建 RSS 阅读器可能用自己的 UA**，会落到默认的 `Disallow: /`。遇到订阅失败，在阅读器分区补一行它的 UA 即可。
 
-`tools/check-site.mjs` 会自检策略没被改回全站放行：`User-agent: *` 必须是 `Disallow: /`，Googlebot / Bingbot / Baiduspider 必须 `Allow: /`。
+`tools/check-site.mjs` 会自检策略没被改跑偏：`User-agent: *` 必须是 `Disallow: /`，Googlebot / Bingbot / Baiduspider 必须 `Allow: /`，上表 AI 搜索那 7 个 UA 必须 `Allow: /`，GPTBot / ClaudeBot / CCBot / Bytespider / Google-Extended / Applebot-Extended / meta-externalagent 必须 `Disallow: /`。
 
 ### 搜索引擎收录
 
@@ -181,6 +182,10 @@ AI 训练与数据采集（GPTBot、OAI-SearchBot、ClaudeBot、CCBot、Perplexi
 | --- | --- | --- |
 | 站长平台验证令牌 | `_config.yml` 的 `seo.verification` | `google` / `bing`，填了才输出对应 meta |
 | IndexNow 密钥 | `seo.indexnow_key` | 构建时生成站点根目录的 `<key>.txt`，Bing / Yandex / Seznam / Naver 免登录核验 |
+
+2026-10-17 复查：**别用脚本抓 Bing 搜索结果页来判断收录**。`https://www.bing.com/search?q=…` 对脚本客户端照样返回 200 和完整 HTML，但只有 `github`、`百度` 这类超热门查询给真实结果；`site:blog.guangluo.top`、`汉口江滩长曝光` 这类查询返回的是随机无关内容（同一个 `site:` 查询三次分别给出 Steam 论坛、DeepSeek 官网和漫画站），「结果数」也在 83 / 144,000 / 243,000 之间乱跳。补 Cookie 会话、`mkt=zh-CN&cc=CN`、`format=rss`、`cn.bing.com` 都试过，行为一致，属 Bing 对无浏览器会话客户端的降级响应。抓取侧则一切正常：用 bingbot 的 UA 请求首页、`sitemap.xml`、`atom.xml` 和文章页都是 200。所以 SERP 抓取只能说明「HTML 抓得到」，不能当作收录证据；要确认收录得登录 Bing Webmaster Tools 做 URL 检查，或填上 `seo.verification.bing` 后走官方 API。
+
+`templates/sitemap.xml` 覆盖了 hexo-generator-sitemap 的默认模板：默认模板会让首页出现两次（posts 循环一次、末尾又硬编码一次），IndexNow 会把同一条 URL 提交两遍，`tools/check-site.mjs` 现在会拦住重复 URL。2026-10-17 实测推送：`node tools/ping-search.mjs _config.domain.yml --strict` 向 `api.indexnow.org` 提交 8 条 URL，返回 200。
 
 百度搜索资源平台暂不接入：域名未备案，提交收录意义不大。备案后再补 `baidu-site-verification` 验证 meta、「普通收录」推送和 `robots.txt` 里的 Baiduspider 分组（分组已保留，因为百度仍可能自己抓取）。
 

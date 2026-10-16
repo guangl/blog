@@ -113,6 +113,8 @@ feed:
 
 sitemap:
   path: sitemap.xml
+  # 自定义模板：自带模板会在首页产出一条重复 URL，见模板里的注释。
+  template: templates/sitemap.xml
   tags: true
   categories: true
 
