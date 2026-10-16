@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, relative, sep } from 'node:path';
 import { load } from 'cheerio';
 import yaml from 'js-yaml';
+import { unescapeHTML } from 'hexo-util';
 
 const config = Object.assign({}, ...['_config.yml', ...process.argv.slice(2)]
   .map(path => yaml.load(readFileSync(path, 'utf8'))));
@@ -35,7 +36,7 @@ function localTarget(value, base, context) {
 }
 
 assert(existsSync(output), 'Run bun run build before checking the site.');
-for (const path of ['index.html', 'about/index.html', 'subscribe/index.html', 'archives/index.html',
+for (const path of ['index.html', 'posts/index.html', 'about/index.html', 'subscribe/index.html', 'archives/index.html',
   'categories/index.html', 'tags/index.html', '404.html', 'atom.xml', 'search.json', 'sitemap.xml', 'robots.txt']) {
   report(existsSync(resolve(output, path)), `Missing required page: ${path}`);
 }
@@ -46,13 +47,15 @@ for (const file of pages) {
   const path = relative(output, file).split(sep).join('/');
   const url = new URL(path, site);
   const $ = load(readFileSync(file, 'utf8'));
-  if (config.domain_migration) {
-    report(!readFileSync(file, 'utf8').includes(config.domain_migration.from_url), `${path}: stale GitHub Pages URL`);
-  }
+  report(!unescapeHTML(readFileSync(file, 'utf8')).includes('https://guangl.github.io/blog'), `${path}: stale GitHub Pages URL`);
   report(Boolean($('title').text().trim()), `${path}: missing title`);
   report(Boolean($('meta[name="description"]').attr('content')), `${path}: missing description`);
+  if (path === 'index.html') {
+    report($('.wiki-hero h1').text() === '记录问题，也记录风景。', 'Native homepage hero is missing');
+    report($('.wiki-hero a[href="#start"]').length > 0 && $('#start').length === 1, 'Homepage reading anchor is missing');
+  }
   report($('main, [role="main"]').length === 1, `${path}: missing main landmark`);
-  report(!($('meta[name="viewport"]').attr('content') || '').includes('maximum-scale'), `${path}: zoom is restricted`);
+  report(($('meta[name="viewport"]').attr('content') || '').includes('width=device-width'), `${path}: missing responsive viewport`);
   const canonical = $('link[rel="canonical"]');
   if (path !== '404.html') {
     report(canonical.length === 1, `${path}: expected one canonical URL`);

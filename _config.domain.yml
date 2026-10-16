@@ -1,16 +1,2 @@
-# 自定义域名构建：hexo generate --config _config.yml,_config.domain.yml
-# 保留默认 GitHub Pages 构建，待托管与 DNS 接入完成后再切换正式入口。
-url: https://blog.guangluo.top
-root: /
+# Cloudflare 上传目录；站点域名和根路径统一在 _config.yml 配置。
 public_dir: public-domain
-avatar: https://blog.guangluo.top/images/avatar.svg
-
-domain_migration:
-  from_url: https://guangl.github.io/blog
-  from_root: /blog/
-
-inject:
-  head:
-    - '<link rel="stylesheet" href="/css/custom.css">'
-  script:
-    - '<script defer src="/js/custom.js"></script>'

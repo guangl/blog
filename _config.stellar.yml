@@ -1,73 +1,110 @@
-# 仅覆盖站点使用的选项，主题本身由 Bun 管理。
-logo:
-  avatar: "[/blog/images/avatar.svg](/about/)"
-  title: "[guangluo's blog](/blog/)"
-  subtitle: "数据库 · 运维 · 生活"
-
-menubar:
-  items:
+# Stellar 2.0 配置；仅覆盖本站使用的选项。
+leftbar:
+  brand:
+    image:
+      src: /images/avatar.svg
+      variant: avatar
+    name: "guangluo's blog"
+    tagline: "数据库 · 运维 · 生活"
+    href: /
+    search: true
+  menu:
     - id: post
       icon: default:documents
       title: 文章
-      url: /
+      url: /posts/
     - id: archives
       icon: default:calendar
       title: 归档
       url: /archives/
     - id: about
-      icon: default:shield-user
+      icon: default:profile
       title: 关于
       url: /about/
     - id: subscribe
       icon: default:rss
       title: 订阅
       url: /subscribe/
+  footer:
+    actions:
+      - type: link
+        icon: default:github
+        title: GitHub
+        url: https://github.com/guangl
+      - type: link
+        icon: default:rss
+        title: Atom 订阅
+        url: /atom.xml
+      - type: spacer
+      - type: dropdown
+        icon: default:theme
+        title: 外观
+        items:
+          - type: button
+            title: 跟随系统
+            onclick: "setColorScheme('auto')"
+          - type: button
+            title: 浅色
+            onclick: "setColorScheme('light')"
+          - type: button
+            title: 深色
+            onclick: "setColorScheme('dark')"
 
-site_tree:
+profiles:
   home:
-    leftbar: welcome, recent, tagcloud
-  index_blog:
-    leftbar: welcome, recent, tagcloud
+    leftbar:
+      widgets: [welcome, recent, tagcloud]
+    rightbar:
+      widgets: [explore]
+  blog_index:
+    path: /posts/
+    leftbar:
+      widgets: [welcome, recent, tagcloud]
+    rightbar:
+      widgets: [explore]
   post:
-    leftbar: welcome, recent
-    rightbar: toc
+    leftbar:
+      widgets: [welcome, recent]
+    rightbar:
+      widgets: [toc]
   page:
-    leftbar: welcome, recent
-    rightbar: toc
+    leftbar:
+      widgets: [welcome, recent]
+    rightbar:
+      widgets: [toc]
+  wiki_index:
+    path: null
+  error:
+    image: /images/404.svg
 
 article:
-  card_style: classic
-  card_tags: true
-  reading_time: true
-  share: [link, email]
-  license: "本文采用 [CC BY 4.0 署名国际许可协议](https://creativecommons.org/licenses/by/4.0/)。转载或改编时请注明作者 Guang Luo，并附上原文和许可证链接。"
+  listing:
+    card_layout: classic
+    show_tags: true
+  show_reading_time: true
+  footer:
+    share: [email]
+    license: "本文采用 [CC BY 4.0 署名国际许可协议](https://creativecommons.org/licenses/by/4.0/)。转载或改编时请注明作者 Guang Luo，并附上原文和许可证链接。"
 
 search:
-  service: local_search
-  local_search:
-    field: all
-    path: /search.json
-    content: true
-    cache_ttl: 3600
+  provider: local
+  local:
+    scope: all
+    include_content: true
+    cache_ttl_seconds: 3600
+
+canonical:
+  host: blog.guangluo.top
 
 structured_data:
-  links:
+  same_as:
     - https://github.com/guangl
 
 footer:
-  social:
-    github:
-      icon: default:github
-      title: GitHub
-      url: https://github.com/guangl
-    rss:
-      icon: default:rss
-      title: Atom 订阅
-      url: /atom.xml
   sitemap:
     - title: 阅读
       items:
-        - "[所有文章](/)"
+        - "[所有文章](/posts/)"
         - "[分类](/categories/)"
         - "[标签](/tags/)"
         - "[归档](/archives/)"
@@ -78,26 +115,30 @@ footer:
         - "[GitHub](https://github.com/guangl)"
         - "[站点地图](/sitemap.xml)"
   content: |
-    © 2026 [{author.name}](/blog/about/)。文章与图片采用 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可协议，另有声明的内容除外。
-    使用 [Hexo](https://hexo.io/) 与 [{theme.name}]({theme.tree}) 构建。
+    © 2026 [{author.name}](/about/)。文章与图片采用 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可协议，另有声明的内容除外。
+    使用 [Hexo](https://hexo.io/) 与 [{theme.name} {theme.version}]({theme.tree}) 构建。
 
-plugins:
-  copycode:
-    default_text: 复制
-    success_text: 已复制
-  scrollreveal:
-    enable: false
-  preload:
-    enable: false
+features:
+  color_scheme_switch:
+    enabled: true
+  reveal:
+    enabled: false
+  link_prefetch:
+    enabled: false
 
-style:
-  prefers_theme: auto
-  color:
-    theme: "#237a75"
-    accent: "#b8753d"
-    link: "#237a75"
-  animated_avatar:
-    animate: false
-  leftbar:
-    background-image: none
-  error_page: /blog/images/404.svg
+appearance:
+  preset: glass
+  color_scheme: auto
+  colors:
+    primary: "hsl(40 96% 55%)"
+    accent: "hsl(14 100% 57%)"
+    link: "hsl(166 66% 32%)"
+  typography:
+    font_family:
+      body: '"Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", ui-serif, Georgia, "Times New Roman", serif'
+  backgrounds:
+    leftbar:
+      type: gradient
+
+fallbacks:
+  avatar: /images/avatar.svg

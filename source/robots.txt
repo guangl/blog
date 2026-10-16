@@ -1,4 +1,4 @@
 User-agent: *
-Allow: /blog/
+Allow: /
 
-Sitemap: https://guangl.github.io/blog/sitemap.xml
+Sitemap: https://blog.guangluo.top/sitemap.xml

@@ -1,0 +1,50 @@
+name: "guangluo's blog"
+headline: 记录问题，也记录风景。
+tagline: 数据库 · 运维 · 生活
+description: 一名 DBA 的数据库管理与运维经验，还有镜头里值得留下的日常。
+route:
+  path: /
+navigation:
+  tree:
+    从这里开始:
+      - index
+hero:
+  enabled: true
+  background:
+    image: /2026/09/13/hankou-river-beach/preview.jpg
+    parallax: 0.2
+  actions:
+    - title: 所有文章
+      url: /posts/
+      icon: default:documents
+    - title: 关于我
+      url: /about/
+      icon: default:profile
+leftbar:
+  brand:
+    source: site
+  menu:
+    - id: post
+      title: 文章
+      icon: default:documents
+      url: /posts/
+    - id: archives
+      title: 归档
+      icon: default:calendar
+      url: /archives/
+    - id: about
+      title: 关于
+      icon: default:profile
+      url: /about/
+    - id: subscribe
+      title: 订阅
+      icon: default:rss
+      url: /subscribe/
+  widgets: [welcome, recent, tagcloud]
+rightbar:
+  widgets: [toc]
+footer:
+  license: false
+  share: []
+comments:
+  enabled: false

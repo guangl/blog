@@ -1,10 +1,11 @@
 ---
 title: 关于
 layout: page
-menu_id: about
+active_menu: about
 date: 2026-10-16 00:00:00
 description: 关于 Guang Luo，一名 DBA 的数据库管理、运维经验与摄影随记。
-comments: false
+comments:
+  enabled: false
 ---
 
 你好，我是 **Guang Luo**，一名 **DBA**。这里是我的个人博客。
@@ -13,10 +14,10 @@ comments: false
 
 ## 从这里开始
 
-- [所有文章](/blog/)：按发布时间浏览更新。
-- [分类](/blog/categories/)与[标签](/blog/tags/)：按主题寻找内容。
-- [归档](/blog/archives/)：沿着时间线翻阅旧文。
-- [订阅更新](/blog/subscribe/)：通过阅读器接收新文章。
+- [所有文章](/posts/)：按发布时间浏览更新。
+- [分类](/categories/)与[标签](/tags/)：按主题寻找内容。
+- [归档](/archives/)：沿着时间线翻阅旧文。
+- [订阅更新](/subscribe/)：通过阅读器接收新文章。
 
 ## 在别处找到我
 

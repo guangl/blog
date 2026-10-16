@@ -6,14 +6,28 @@ welcome:
 
     管理数据库，记录经验，偶尔带着相机出门。
 
-    [关于本站](/blog/about/) · [订阅更新](/blog/subscribe/)
+    [关于本站](/about/) · [订阅更新](/subscribe/)
 
 recent:
   limit: 5
-  rss: /blog/atom.xml
+  rss: /atom.xml
 
 tagcloud:
   title: 按标签探索
   min_font: 14
   max_font: 18
   show_count: true
+
+explore:
+  layout: markdown
+  title: 阅读导航
+  content: |
+    [所有文章](/posts/)
+
+    [分类浏览](/categories/) · [标签探索](/tags/)
+
+    [文章归档](/archives/)
+
+    ---
+
+    [订阅更新](/subscribe/)，让新文章来到你的阅读器。
