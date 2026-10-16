@@ -13,6 +13,8 @@ name: Renew mainland server certificate
 #
 # Settings → Secrets and variables → Actions：
 #   Variables SERVER_CERT_RENEW = true；可选 SERVER_CERT_THRESHOLD_DAYS（默认 21）
+# 手动运行时可以只处理一个域名（inputs.domains，如 blog.guangluo.top），
+# 配合 force 就能单独重签某一个，不浪费另外两个的配额。
 #   Secrets   TENCENT_SECRET_ID / TENCENT_SECRET_KEY（腾讯云 CAM 密钥）
 #             CLOUDFLARE_DNS_TOKEN（Cloudflare Token，权限 Zone → DNS → Edit）
 #             SERVER_HOST / SERVER_USER / SERVER_SSH_KEY（与发布通道共用）
@@ -41,6 +43,10 @@ on:
         description: 只检查剩余天数，不申请、不改服务器
         type: boolean
         default: false
+      domains:
+        description: 只处理这几个域名（逗号分隔，默认全部）
+        type: string
+        default: '' 
 
 permissions:
   contents: read
@@ -101,6 +107,7 @@ jobs:
           if [ -n "${{ vars.SERVER_CERT_THRESHOLD_DAYS }}" ]; then
             args+=(--threshold "${{ vars.SERVER_CERT_THRESHOLD_DAYS }}")
           fi
+          if [ -n "${{ inputs.domains }}" ]; then args+=(--domains "${{ inputs.domains }}"); fi
           # 某个域名失败时脚本退出码是 1，但计划（JSON）照样会输出：先把成功的装上，
           # 失败的留到最后一步统一报红，不因为一个域名把另外两个白签一遍。
           node tools/ssl-renew.mjs "${args[@]}" > .cert-plan.json || status=$?
