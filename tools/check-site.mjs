@@ -382,7 +382,7 @@ if (police) {
 // README 与文档之间用相对路径互相引用。这些链接不参与站点构建，所以断了也没人会发现；
 // 2026-10-17 就出现过 docs/ 整个目录从工作区消失、而所有检查照常通过的情况。
 // 这里把「仓库内的文档链接」也纳入自检。
-for (const doc of ['README.md', 'docs/domain-deployment.md', 'docs/mainland-hosting.md']) {
+for (const doc of ['README.md', 'docs/domain-deployment.md', 'docs/mainland-hosting.md', 'docs/site-audit.md']) {
   if (!existsSync(doc)) {
     errors.push(`Missing documentation file: ${doc}`);
     continue;

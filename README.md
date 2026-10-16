@@ -162,6 +162,23 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 
 仓库还有第二条发布通道：`.github/workflows/deploy-server.yml` 用 rsync 把 `public-domain/` 同步到腾讯云 ECS（大陆主站，Nginx 直接托管静态文件）。它默认关闭，用仓库变量 `SERVER_DEPLOY=true` 打开；服务器初始化、备案与切解析顺序见 [大陆托管与备案](docs/mainland-hosting.md)。备案号填 `_config.yml` 的 `beian` 段，留空时页脚不输出任何内容。
 
+### 线上定时体检
+
+`verify` 只证明「产物里该有的都有」，看不到线上真实的一面：响应头到底发出去没有、证书还剩几天、页面里的外链有没有烂掉。这三件事由 `.github/workflows/site-audit.yml` 每周一 09:00（北京时间，cron 写 UTC 的 `0 1 * * 1`）打一次线上站点：
+
+```bash
+node tools/audit-live.mjs            # 体检 https://blog.guangluo.top/
+node tools/audit-live.mjs --json     # 机器可读输出
+node tools/audit-live.mjs --base http://127.0.0.1:4001/   # 换目标（比如本地 hexo server）
+```
+
+- 页面清单取自线上 `sitemap.xml`，逐个断言 200；
+- 首页的 7 个安全响应头与 `scripts/cloudflare-headers.js` **逐字符比对**（脚本在 `node:vm` 沙箱里跑一遍这个构建期插件取期望值，工具里没有第二份 CSP 抄本，所以「改了源文件忘了部署」会被指出来）；
+- TLS 证书剩余有效期少于 14 天报警；
+- 页面外链死链检查：只有 `404` / `410` 算失败，`403` / `429` 这类「对方拦脚本客户端」只算告警。
+
+体检与发布互不依赖：它红了不会拦住发布，发布失败也不影响体检。判定规则、为什么 403/429 不算失败、后续扩展点见 [线上站点定时体检](docs/site-audit.md)。任务面板会自动停掉长期无活动的定时工作流，仓库有提交就不会触发。
+
 ## 常用修改位置
 
 | 内容 | 文件 |
@@ -180,6 +197,8 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 | 图标文件生成 | `tools/make-favicon.mjs` |
 | 产物自检的硬约束 | `tools/check-site.mjs` |
 | 对比度 / 裂图 / CSP 实测 | `tools/browser-check.mjs` |
+| 线上体检的检查项与判定规则 | `tools/audit-live.mjs`、`docs/site-audit.md` |
+| 依赖更新的节奏与生态 | `.github/dependabot.yml` |
 
 ## 关于专栏与笔记本
 
