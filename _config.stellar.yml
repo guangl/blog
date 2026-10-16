@@ -6,7 +6,7 @@ topbar:
     image:
       src: /images/avatar.png
       variant: icon
-    name: "guangluo's blog"
+    name: "个人摄影学习之路"
     tagline: "数据库 · 运维 · 生活"
     href: /
   menu:
@@ -44,7 +44,7 @@ leftbar:
     image:
       src: /images/avatar.png
       variant: icon
-    name: "guangluo's blog"
+    name: "个人摄影学习之路"
     tagline: "数据库 · 运维 · 生活"
     href: /
     search: true
@@ -158,11 +158,15 @@ canonical:
   # 必须是裸主机名：主题会把它 base64 后与 location.hostname 比对，
   # 判断当前访问的主机是否为主站。
   host: blog.guangluo.top
-  # 允许的备用主机。Cloudflare Pages 的默认域名也要列进来：
-  # 否则从 guangluo-blog.pages.dev 访问会弹出「非法克隆站」提示，
-  # 而且搜索引擎可能把这个重复地址当成另一个站点收录。
+  # 允许的备用主机。不在这个名单里的主机访问时会弹出「非法克隆站」提示。
+  # 主题的判定逻辑（source/js/main.js 的 canonicalCheck）：
+  #   1. 先把当前 hostname 的 `www.` 前缀剥掉，所以列裸域即可覆盖 www；
+  #   2. 与 canonical.host 相等、或在 allowed_hosts 里，就放行；
+  #   3. 命中 `localhost` 时直接跳过检查。
   allowed_hosts:
     - guangluo-blog.pages.dev
+    - guangluo.top          # 裸域与 www 都归一到这里
+    - 82.156.50.189         # 大陆 ECS 公网 IP：备案通过前用 IP 直接访问
 
 # Open Graph / Twitter 卡片。主题默认已开启，这里显式声明，
 # 便于日后调整时能看到开关位置。
