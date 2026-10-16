@@ -150,7 +150,7 @@ bun run verify
 
 此命令清理并构建站点，然后检查本地链接与资源、必要页面、规范链接、搜索索引、Atom、站点地图和版权协议。只检查已有生成结果时运行 `bun run check`。
 
-自检里还有几组「配置了就必须生效」的硬约束，都是踩过坑之后加的：每页恰好一个 `h1`、每张图都有 `alt`、`<picture>` 必须带 `srcset` 与尺寸、`_headers` 的安全头与缓存规则齐全、`favicon.ico` / `apple-touch-icon.png` / `/examples/` 必须在产物里、站点地图不许有重复 URL。改这些地方时别把自检一起改松——它失败是有原因的。
+自检里还有几组「配置了就必须生效」的硬约束，都是踩过坑之后加的：每页恰好一个 `h1`、每张图都有 `alt`、viewport 里不许有缩放锁、每页要有指向 `#main` 的 skip link、社交卡片图不能是站点头像、`<picture>` 必须带 `srcset` 与尺寸、`_headers` 的安全头与缓存规则齐全、`favicon.ico` / `apple-touch-icon.png` / `/examples/` 必须在产物里、站点地图不许有重复 URL 且带图的文章必须有图片记录。改这些地方时别把自检一起改松——它失败是有原因的。
 
 ```bash
 bun run verify:domain     # 生成并验证 Cloudflare 上传目录 public-domain/
@@ -174,6 +174,7 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 | 公式 / 图表 / 时间线的验证页 | `source/examples/index.md` |
 | 订阅正文的相对资源路径与版权 | `templates/atom.xml` |
 | 响应式图片与变体生成 | `scripts/image-pipeline.js` |
+| 站点地图的 URL 与图片/归档补全 | `templates/sitemap.xml`、`scripts/sitemap-extras.js` |
 | 安全响应头与缓存策略 | `scripts/cloudflare-headers.js` |
 | `h1` / `alt` / skip link 等无障碍修正 | `scripts/a11y.js` |
 | 图标文件生成 | `tools/make-favicon.mjs` |
@@ -275,7 +276,20 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 
 2026-10-17 复查：**别用脚本抓 Bing 搜索结果页来判断收录**。`https://www.bing.com/search?q=…` 对脚本客户端照样返回 200 和完整 HTML，但只有 `github`、`百度` 这类超热门查询给真实结果；`site:blog.guangluo.top`、`汉口江滩长曝光` 这类查询返回的是随机无关内容（同一个 `site:` 查询三次分别给出 Steam 论坛、DeepSeek 官网和漫画站），「结果数」也在 83 / 144,000 / 243,000 之间乱跳。补 Cookie 会话、`mkt=zh-CN&cc=CN`、`format=rss`、`cn.bing.com` 都试过，行为一致，属 Bing 对无浏览器会话客户端的降级响应。抓取侧则一切正常：用 bingbot 的 UA 请求首页、`sitemap.xml`、`atom.xml` 和文章页都是 200。所以 SERP 抓取只能说明「HTML 抓得到」，不能当作收录证据；要确认收录得登录 Bing Webmaster Tools 做 URL 检查，或填上 `seo.verification.bing` 后走官方 API。
 
-`templates/sitemap.xml` 覆盖了 hexo-generator-sitemap 的默认模板：默认模板会让首页出现两次（posts 循环一次、末尾又硬编码一次），IndexNow 会把同一条 URL 提交两遍，`tools/check-site.mjs` 现在会拦住重复 URL。2026-10-17 实测推送：`node tools/ping-search.mjs _config.domain.yml --strict` 向 `api.indexnow.org` 提交 8 条 URL，返回 200。
+`templates/sitemap.xml` 覆盖了 hexo-generator-sitemap 的默认模板：默认模板会让首页出现两次（posts 循环一次、末尾又硬编码一次），IndexNow 会把同一条 URL 提交两遍，`tools/check-site.mjs` 现在会拦住重复 URL。
+
+站点地图由两半拼起来（2026-10-17 扩写）：
+
+| 部分 | 位置 | 负责的内容 |
+| --- | --- | --- |
+| 模板 | `templates/sitemap.xml` | 文章、首页、标签、分类，以及 `xmlns:image` 命名空间 |
+| 构建期脚本 | `scripts/sitemap-extras.js` | 每篇文章的 `<image:image>`、`/posts/` 与 `/archives/`、年月归档 |
+
+为什么要分成两半：nunjucks 模板只能拿到 generator 传进去的 `posts` / `tags` / `categories`，而图片清单要从正文里现取、归档页根本不是 post 或 page，模板里都写不出来。脚本挂在 `after_generate` 上改写 `sitemap.xml` 这条路由，先查 `hexo.route.list()` 再决定收不收，所以不会出现「模板里写了、产物里没有」的 404 条目。自检会逐条校验 `<loc>` 与 `<image:loc>` 都能在产物里找到实体，并且**带图的文章必须有图片记录**。
+
+收录口径：收文章、首页、`/posts/`、`/archives/` 与年月归档、分类页、标签页、独立页面；**不收分页**（`/posts/page/2/`）——同一批文章在分页里重复出现，`page/1` 与 `/posts/` 还是同一份内容，收进来只浪费抓取配额。
+
+2026-10-17 实测推送：`node tools/ping-search.mjs _config.domain.yml --strict` 向 `api.indexnow.org` 提交站点地图里的 URL（条数随内容变化，别写死），返回 200。`<image:loc>` 不会被当成页面 URL 推给 IndexNow（`tools/ping-search.mjs` 用的是 cheerio 的 `loc` 选择器，`image:loc` 不在其中）。
 
 百度搜索资源平台暂不接入：域名未备案，提交收录意义不大。备案后再补 `baidu-site-verification` 验证 meta、「普通收录」推送和 `robots.txt` 里的 Baiduspider 分组（分组已保留，因为百度仍可能自己抓取）。
 
@@ -300,6 +314,7 @@ bun run seo:ping       # 推送 IndexNow
 | `beian.js` | 备案号页脚，留空时完全不输出 |
 | `canonical-notice.js` | 关掉主题的「非法克隆站 / 官方备用站」浮层 |
 | `lazy-images.js` | 给已经有真实 `src` 的图补原生 `loading` / `decoding` |
+| `sitemap-extras.js` | 图片 sitemap 与 `/posts/`、归档页补进 `sitemap.xml`（见 [搜索引擎收录](#搜索引擎收录)） |
 
 `_config.stellar.yml` 的 `inject.head_end` 负责两件事：图标链接（`favicon.ico` 与 `apple-touch-icon.png`）和首页 Hero 的对比度修正。
 

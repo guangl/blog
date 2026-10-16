@@ -6,9 +6,16 @@
   配额，IndexNow 还会把同一条 URL 提交两次，所以这里在循环里跳过首页，
   首页统一由末尾那条 priority 1.0 的记录负责。
   改动本文件后 tools/check-site.mjs 会校验 sitemap 里没有重复 URL。
+
+  这里只负责「模板拿得到的数据」：文章、首页、标签、分类。另外两块由
+  scripts/sitemap-extras.js 在 after_generate 里补：
+    - `<image:image>`（图片 sitemap，照片站的图片搜索入口）；
+    - `/posts/` 与 `/archives/`、年月归档（它们不是 post 也不是 page，
+      模板里的 posts 循环扫不到）。
+  命名空间写在这里、图片块由脚本插入，两边必须同时在位。
 -#}
 {% set siteUrl = config.url | uriencode %}
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   {% for post in posts %}
   {% if (post.permalink | uriencode) != siteUrl and (post.permalink | uriencode) != siteUrl + '/' %}
   <url>

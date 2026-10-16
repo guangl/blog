@@ -196,11 +196,35 @@ feed('entry').each((_, element) => {
   });
 });
 
-const sitemap = load(readFileSync(resolve(output, 'sitemap.xml'), 'utf8'), { xmlMode: true });
+const sitemapText = readFileSync(resolve(output, 'sitemap.xml'), 'utf8');
+const sitemap = load(sitemapText, { xmlMode: true });
 sitemap('loc').each((_, element) => localTarget(sitemap(element).text(), site, 'sitemap.xml'));
 const sitemapUrls = sitemap('loc').toArray().map(element => sitemap(element).text().trim());
 report(sitemapUrls.length > 0, 'sitemap.xml has no URLs');
 report(sitemapUrls.includes(site.href), 'sitemap.xml is missing the homepage');
+// 列表页与归档页由 scripts/sitemap-extras.js 在 after_generate 里补（模板的 posts
+// 循环扫不到它们）。这里是「收录口径」的硬约束：这两类入口必须收。
+report(sitemapText.includes('xmlns:image='),
+  'sitemap.xml is missing the image sitemap namespace (templates/sitemap.xml)');
+for (const path of ['posts/', 'archives/']) {
+  report(sitemapUrls.includes(new URL(path, site).href), `sitemap.xml is missing ${path}`);
+}
+// 图片 sitemap（Google 的 image 扩展）：每条都要能在产物里找到实体，
+// 而且带图的文章必须至少有一条图片记录——照片站的图片搜索入口。
+const sitemapImageUrls = [...sitemapText.matchAll(/<image:loc>([\s\S]*?)<\/image:loc>/g)]
+  .map(match => match[1].trim());
+for (const image of sitemapImageUrls) {
+  report(/^https?:\/\//.test(image), `sitemap.xml image is not absolute: ${image}`);
+  localTarget(image, site, 'sitemap.xml image');
+}
+for (const article of articles) {
+  const declared = (Array.isArray(article.image) ? article.image : [article.image])
+    .map(entry => (typeof entry === 'string' ? entry : entry && entry.url))
+    .filter(value => typeof value === 'string' && value.length > 0);
+  if (declared.length === 0) continue;
+  report(declared.some(image => sitemapImageUrls.includes(image)),
+    `Article missing from the image sitemap: ${article.headline}`);
+}
 // 重复 URL 会浪费抓取配额，IndexNow 也会把同一条提交两次；模板改动最容易在这里翻车。
 const duplicatedSitemapUrls = sitemapUrls.filter((url, index) => sitemapUrls.indexOf(url) !== index);
 report(duplicatedSitemapUrls.length === 0,
