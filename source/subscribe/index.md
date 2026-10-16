@@ -2,6 +2,9 @@
 title: 订阅更新
 layout: page
 active_menu: subscribe
+collection:
+  profile: wiki
+  id: home
 date: 2026-10-16 00:00:00
 description: 使用 Atom / RSS 阅读器订阅博客，在新文章发布后接收更新。
 comments:

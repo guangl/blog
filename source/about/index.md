@@ -2,6 +2,9 @@
 title: 关于
 layout: page
 active_menu: about
+collection:
+  profile: wiki
+  id: home
 date: 2026-10-16 00:00:00
 description: 关于 Guang Luo，一名 DBA 的数据库管理、运维经验与摄影随记。
 comments:
