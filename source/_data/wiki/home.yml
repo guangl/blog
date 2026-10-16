@@ -1,7 +1,7 @@
 name: "个人摄影学习之路"
-headline: 记录问题，也记录风景。
-tagline: 数据库 · 运维 · 生活
-description: 一名 DBA 的数据库管理与运维经验，还有镜头里值得留下的日常。
+headline: 把每一次快门都当作练习。
+tagline: 摄影 · 练习 · 记录
+description: 从曝光、构图到后期，记录学习摄影的过程，也留下出门时遇到的光。
 # 右栏仓库卡片（ghrepo）读取这里。
 source:
   repository: guangl/blog

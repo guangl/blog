@@ -1,8 +1,0 @@
-name: DBA 排查实录
-tagline: 从现象到原因的完整排查过程
-# 专栏没有独立主页，入口由专栏总索引 /topic/ 提供，封面卡片指向首篇文章。
-# 按时间正序阅读，形成「先看现象，再看定位」的递进顺序。
-listing:
-  sort:
-    field: date
-    direction: asc
