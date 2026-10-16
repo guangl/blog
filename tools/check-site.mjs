@@ -3,7 +3,9 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, relative, sep } from 'node:path';
 import { load } from 'cheerio';
 import yaml from 'js-yaml';
-import { unescapeHTML } from 'hexo-util';
+import hexoUtil from 'hexo-util';
+
+const { unescapeHTML } = hexoUtil;
 
 const config = Object.assign({}, ...['_config.yml', ...process.argv.slice(2)]
   .map(path => yaml.load(readFileSync(path, 'utf8'))));
