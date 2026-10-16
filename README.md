@@ -92,6 +92,8 @@ bun run verify
 
 Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建并发布到 Cloudflare Pages。Cloudflare 自动发布需要先添加仓库 Secret `CLOUDFLARE_API_TOKEN`，设置方法见 [域名部署说明](docs/domain-deployment.md)。检查通过后才会发布。`bun run deploy` 尚未配置 Hexo 部署适配器。
 
+仓库还有第二条发布通道：`.github/workflows/deploy-server.yml` 用 rsync 把 `public-domain/` 同步到腾讯云 ECS（大陆主站，Nginx 直接托管静态文件）。它默认关闭，用仓库变量 `SERVER_DEPLOY=true` 打开；服务器初始化、备案与切解析顺序见 [大陆托管与备案](docs/mainland-hosting.md)。
+
 ## 常用修改位置
 
 | 内容 | 文件 |
