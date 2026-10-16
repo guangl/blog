@@ -1,103 +1,245 @@
-# 仅覆盖站点使用的选项，主题本身由 Bun 管理。
-logo:
-  avatar: "[/blog/images/avatar.svg](/about/)"
-  title: "[guangluo's blog](/blog/)"
-  subtitle: "数据库 · 运维 · 生活"
-
-menubar:
-  items:
+# Stellar 2.0 配置；仅覆盖本站使用的选项。
+# 主要导航与站内搜索移到顶部栏，左侧栏留给内容本身，与官方文档站的布局一致。
+topbar:
+  enabled: true
+  brand:
+    image:
+      src: /images/avatar.png
+      variant: icon
+    name: "guangluo's blog"
+    tagline: "数据库 · 运维 · 生活"
+    href: /
+  menu:
     - id: post
       icon: default:documents
       title: 文章
-      url: /
+      url: /posts/
+    - id: topic
+      icon: default:pin
+      title: 专栏
+      url: /topic/
+    - id: notebooks
+      icon: default:notebook
+      title: 笔记本
+      url: /notebooks/
     - id: archives
       icon: default:calendar
       title: 归档
       url: /archives/
     - id: about
-      icon: default:shield-user
+      icon: default:profile
       title: 关于
       url: /about/
     - id: subscribe
       icon: default:rss
       title: 订阅
       url: /subscribe/
+  widgets:
+    - spacer
+    - menu
+    - settings
 
-site_tree:
+leftbar:
+  brand:
+    image:
+      src: /images/avatar.png
+      variant: icon
+    name: "guangluo's blog"
+    tagline: "数据库 · 运维 · 生活"
+    href: /
+    search: true
+  # 导航已在顶部栏，左侧栏不再重复；Wiki 页面会用文档树替换这里的内容。
+  menu: []
+  footer:
+    actions:
+      - type: link
+        icon: default:github
+        title: GitHub
+        url: https://github.com/guangl
+      - type: link
+        icon: default:rss
+        title: Atom 订阅
+        url: /atom.xml
+      - type: spacer
+      - type: dropdown
+        icon: default:theme
+        title: 外观
+        items:
+          - type: button
+            title: 跟随系统
+            onclick: "setColorScheme('auto')"
+          - type: button
+            title: 浅色
+            onclick: "setColorScheme('light')"
+          - type: button
+            title: 深色
+            onclick: "setColorScheme('dark')"
+
+profiles:
   home:
-    leftbar: welcome, recent, tagcloud
-  index_blog:
-    leftbar: welcome, recent, tagcloud
+    leftbar:
+      widgets: [welcome, recent, tagcloud]
+    rightbar:
+      widgets: [explore]
+  blog_index:
+    path: /posts/
+    leftbar:
+      widgets: [welcome, recent, tagcloud]
+    rightbar:
+      widgets: [explore]
   post:
-    leftbar: welcome, recent
-    rightbar: toc
+    leftbar:
+      widgets: [welcome, recent]
+    rightbar:
+      widgets: [toc]
   page:
-    leftbar: welcome, recent
-    rightbar: toc
+    leftbar:
+      widgets: [welcome, recent]
+    rightbar:
+      widgets: [toc]
+  # Wiki 文档页：左栏固定菜单让位给文档树，右栏保留目录。
+  # 右栏的仓库卡片（ghrepo）由集合数据提供，这里只保留目录。
+  wiki:
+    leftbar:
+      menu: []
+      widgets: [tree, related]
+    rightbar:
+      widgets: [toc]
+  wiki_index:
+    path: null
+  # 专栏：文章仍留在 _posts/，这里只控制列表页与高亮的菜单项。
+  topic:
+    path: /topic/
+    active_menu: topic
+    leftbar:
+      widgets: [recent, tagcloud]
+    rightbar:
+      widgets: [ghrepo, toc]
+  # 笔记本：总索引 + 单本列表页 + 笔记详情页，左栏用标签树整理。
+  notebooks:
+    path: /notebooks/
+    active_menu: notebooks
+    leftbar:
+      widgets: [recent, tagcloud]
+    rightbar:
+      widgets: []
+  notebook:
+    active_menu: notebooks
+    leftbar:
+      widgets: [tagtree, recent]
+    rightbar:
+      widgets: []
+  note:
+    active_menu: notebooks
+    leftbar:
+      widgets: [tagtree, recent]
+    rightbar:
+      widgets: [toc]
+  error:
+    image: /images/404.svg
 
 article:
-  card_style: classic
-  card_tags: true
-  reading_time: true
-  share: [link, email]
-  license: "本文采用 [CC BY 4.0 署名国际许可协议](https://creativecommons.org/licenses/by/4.0/)。转载或改编时请注明作者 Guang Luo，并附上原文和许可证链接。"
+  listing:
+    card_layout: classic
+    show_tags: true
+  show_reading_time: true
+  footer:
+    share: [email]
+    license: "本文采用 [CC BY 4.0 署名国际许可协议](https://creativecommons.org/licenses/by/4.0/)。转载或改编时请注明作者 Guang Luo，并附上原文和许可证链接。"
 
 search:
-  service: local_search
-  local_search:
-    field: all
-    path: /search.json
-    content: true
-    cache_ttl: 3600
+  provider: local
+  local:
+    scope: all
+    include_content: true
+    cache_ttl_seconds: 3600
+
+canonical:
+  # 必须是裸主机名：主题会把它 base64 后与 location.hostname 比对，
+  # 判断当前访问的主机是否为主站。
+  host: blog.guangluo.top
+  # 允许的备用主机。Cloudflare Pages 的默认域名也要列进来：
+  # 否则从 guangluo-blog.pages.dev 访问会弹出「非法克隆站」提示，
+  # 而且搜索引擎可能把这个重复地址当成另一个站点收录。
+  allowed_hosts:
+    - guangluo-blog.pages.dev
+
+# Open Graph / Twitter 卡片。主题默认已开启，这里显式声明，
+# 便于日后调整时能看到开关位置。
+open_graph:
+  enabled: true
 
 structured_data:
-  links:
+  # 告诉搜索引擎这些外部资料属于本站作者，用于知识面板等场景。
+  same_as:
     - https://github.com/guangl
 
 footer:
-  social:
-    github:
-      icon: default:github
-      title: GitHub
-      url: https://github.com/guangl
-    rss:
-      icon: default:rss
-      title: Atom 订阅
-      url: /atom.xml
   sitemap:
     - title: 阅读
       items:
-        - "[所有文章](/)"
+        - "[所有文章](/posts/)"
+        - "[专栏](/topic/)"
+        - "[笔记本](/notebooks/)"
+        - "[归档](/archives/)"
+    - title: 检索
+      items:
         - "[分类](/categories/)"
         - "[标签](/tags/)"
-        - "[归档](/archives/)"
+        - "[DBA 手记](/notebooks/dba/)"
+        - "[订阅更新](/subscribe/)"
     - title: 本站
       items:
         - "[关于博客](/about/)"
-        - "[订阅更新](/subscribe/)"
         - "[GitHub](https://github.com/guangl)"
         - "[站点地图](/sitemap.xml)"
   content: |
-    © 2026 [{author.name}](/blog/about/)。文章与图片采用 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可协议，另有声明的内容除外。
-    使用 [Hexo](https://hexo.io/) 与 [{theme.name}]({theme.tree}) 构建。
+    © 2026 [{author.name}](/about/)。文章与图片采用 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可协议，另有声明的内容除外。
+    使用 [Hexo](https://hexo.io/) 与 [{theme.name} {theme.version}]({theme.tree}) 构建。
 
-plugins:
-  copycode:
-    default_text: 复制
-    success_text: 已复制
-  scrollreveal:
-    enable: false
-  preload:
-    enable: false
+features:
+  color_scheme_switch:
+    enabled: true
+  reveal:
+    enabled: true
+    duration: 800
+    interval: 200
+    distance: 8
+    blur: 4
+  link_prefetch:
+    enabled: false
+  card_hover:
+    spotlight: true
+    tilt: true
+  # 数学公式：客户端用 MathJax 排版，仅在页面出现公式时加载。
+  math:
+    provider: null
+  # 图表：客户端用 Mermaid 渲染 ```mermaid 代码块，仅在图表示例页加载。
+  diagrams:
+    provider: mermaid
+    mermaid:
+      theme: neutral
+  lazy_loading:
+    transition: fade
+    auto_aspect_ratio: true
 
-style:
-  prefers_theme: auto
-  color:
-    theme: "#237a75"
-    accent: "#b8753d"
-    link: "#237a75"
-  animated_avatar:
-    animate: false
-  leftbar:
-    background-image: none
-  error_page: /blog/images/404.svg
+appearance:
+  preset: minimal
+  color_scheme: auto
+  colors:
+    primary: "hsl(40 96% 55%)"
+    accent: "hsl(24 100% 50%)"
+    link: "hsl(166 66% 32%)"
+  typography:
+    font_family:
+      body: '"Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", ui-serif, Georgia, "Times New Roman", serif'
+      code: 'Monaco, Menlo, Consolas, system-ui, "Courier New", monospace, sans-serif'
+  backgrounds:
+    leftbar:
+      type: gradient
+
+fallbacks:
+  avatar: /images/avatar.png
+  # 未设置封面的文章在结构化数据、链接卡片等处使用的默认图。
+  # 主题默认指向作者 CDN 的占位图，这里换成自己的图（1200×630，适合社交卡片）。
+  cover: /images/cover.jpg

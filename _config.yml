@@ -10,13 +10,13 @@ keywords: 数据库, DBA, 数据库管理, 数据库运维, 摄影
 author: Guang Luo
 language: zh-CN
 timezone: Asia/Shanghai
-avatar: https://guangl.github.io/blog/images/avatar.svg
+avatar: https://blog.guangluo.top/images/avatar.png
 favicon: /images/favicon.svg
 
 # URL
 ## Set your site url here. For example, if you use GitHub Page, set url as 'https://username.github.io/project'
-url: https://guangl.github.io/blog
-root: /blog/
+url: https://blog.guangluo.top
+root: /
 permalink: :year/:month/:day/:title/
 permalink_defaults:
 pretty_urls:
@@ -66,7 +66,7 @@ marked:
 # per_page: Posts displayed per page. (0 = disable pagination)
 # order_by: Posts order. (Order by date descending by default)
 index_generator:
-  path: ""
+  path: "posts"
   per_page: 10
   order_by: -date
 
@@ -115,12 +115,6 @@ sitemap:
   path: sitemap.xml
   tags: true
   categories: true
-
-inject:
-  head:
-    - '<link rel="stylesheet" href="/blog/css/custom.css">'
-  script:
-    - '<script defer src="/blog/js/custom.js"></script>'
 
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment

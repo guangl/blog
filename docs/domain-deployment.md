@@ -11,7 +11,7 @@
 - 已配置 GitHub 仓库 Secret 并启用自动发布，[首次 GitHub Actions 发布](https://github.com/guangl/blog/actions/runs/38893301306)已成功，构建和站点检查均通过。
 - 域名暂未备案，使用 Cloudflare 的全球网络；大陆直连效果需要上线后实测。
 - 当前授权可部署 Pages、绑定域名和读取区域信息，不含 DNS 修改权限。DNS 记录由域名所有者在控制台添加。
-- Pages API 和 GitHub Actions 均确认部署成功。本机 HTTPS 请求仍遇到 TLS 连接错误，客户端访问情况需在实际使用网络中验证。
+- Pages API 和 GitHub Actions 均确认部署成功；大陆访问表现需结合实际运营商网络测试。
 
 ## 本地构建与验证
 
@@ -20,7 +20,7 @@ bun install --frozen-lockfile
 bun run verify:domain
 ```
 
-产物在 `public-domain/`，包括使用新域名的 canonical、Open Graph、结构化数据、订阅源和站点地图，以及根目录的 `robots.txt`。构建会将旧 `/blog/` 内链与图片路径适配到新站根目录。
+产物在 `public-domain/`，包括使用新域名的 canonical、Open Graph、结构化数据、订阅源和站点地图，以及根目录的 `robots.txt`。站点配置、内链与图片路径已统一使用正式域名和根路径。
 
 预览新站：
 
@@ -28,7 +28,7 @@ bun run verify:domain
 bun run server:domain
 ```
 
-访问 `http://localhost:4001/`。默认 `bun run verify`、`bun run server` 和 GitHub Pages 工作流仍使用原来的 `/blog/` 配置。
+访问 `http://localhost:4001/`。默认构建也使用相同域名与根路径，仅输出目录不同。
 
 ## 后续发布
 
@@ -42,15 +42,7 @@ bun run server:domain
 
 Token 只放在 GitHub Secret，不提交到仓库。当前本机 Wrangler 的 OAuth 登录用于本地发布，不能替代 GitHub Actions 的部署 Token。
 
-平时只需修改文章并提交、推送：
-
-```bash
-git add source/
-git commit -m "更新文章"
-git push origin main
-```
-
-如果同时修改配置、模板或其他文件，也要一并提交。旧 GitHub Pages 工作流继续发布原 `/blog/` 站点，两个发布流程使用不同的构建目录。
+平时修改文章后，在功能分支提交并创建 Pull Request。检查通过并确认合并到 `main` 后，Cloudflare 自动发布新版本。源码和检查仍在 GitHub；旧 GitHub Pages 发布任务已移除，旧地址不再自动更新。
 
 本机手动发布仍可作为备用方式：
 
@@ -58,7 +50,7 @@ git push origin main
 bun run deploy:domain
 ```
 
-命令会先重新构建并检查，再将 `public-domain/` 上传到已有的 `guangluo-blog` 项目。Stellar 固定为兼容当前配置的 `1.44.0`；升级到 2.x 需要先迁移主题配置。
+命令会先执行主题 Doctor、重新构建并检查，再将 `public-domain/` 上传到已有的 `guangluo-blog` 项目。Stellar 已升级并固定为 `2.0.0`，配置与页面字段已迁移。正式域名与根路径统一在 `_config.yml` 配置，`_config.domain.yml` 仅指定上传目录。首页使用原生 Wiki Hero，没有自定义 JS、CSS 或路径适配脚本。
 
 ## 手动上传备用方式
 
@@ -89,6 +81,6 @@ Direct Upload 项目后续可使用 Wrangler 和 GitHub Actions 自动部署。C
 - 检查首页、文章、图片、搜索、订阅源、站点地图和 404 状态。
 - 在大陆宽带及移动网络中对比测试，记录首屏、文章图片与失败请求；境外区不保证解决所有跨境连接问题。
 - 将 `https://blog.guangluo.top/sitemap.xml` 提交到搜索引擎站长平台。
-- 新域名确认可用后，再决定旧站的跳转和正式发布流程。
+- 只维护 `blog.guangluo.top`，旧 GitHub Pages 地址停止更新。
 
 参考：[Cloudflare Pages Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/)、[Pages 自定义域名](https://developers.cloudflare.com/pages/configuration/custom-domains/)。

@@ -9,8 +9,9 @@ tags:
   - 长曝光
   - 风光摄影
 description: 在汉口江滩使用 ND64000 减光镜拍摄的长曝光照片。
-cover: /blog/2026/09/13/hankou-river-beach/cover.jpg
-type: story
+cover: /2026/09/13/hankou-river-beach/cover.jpg
+article:
+  style: story
 ---
 
 在汉口江滩做的长曝光，使用 ND64000 减光镜拍摄出来的。

@@ -12,9 +12,9 @@
     "deploy": "hexo deploy",
     "server": "hexo server",
     "check": "node tools/check-site.mjs",
-    "verify": "hexo clean && hexo generate && node tools/check-site.mjs",
+    "verify": "hexo stellar doctor && hexo clean && hexo generate && node tools/check-site.mjs",
     "build:domain": "hexo generate --config _config.yml,_config.domain.yml",
-    "verify:domain": "hexo clean --config _config.yml,_config.domain.yml && hexo generate --config _config.yml,_config.domain.yml && node tools/check-site.mjs _config.domain.yml",
+    "verify:domain": "hexo stellar doctor --config _config.yml,_config.domain.yml && hexo clean --config _config.yml,_config.domain.yml && hexo generate --config _config.yml,_config.domain.yml && node tools/check-site.mjs _config.domain.yml",
     "server:domain": "hexo server --config _config.yml,_config.domain.yml --port 4001",
     "deploy:domain": "bun run verify:domain && bunx wrangler@4.151.0 pages deploy public-domain --project-name guangluo-blog --branch main --commit-dirty=true"
   },
@@ -33,7 +33,7 @@
     "hexo-renderer-marked": "^7.0.0",
     "hexo-renderer-stylus": "^3.0.1",
     "hexo-server": "^3.0.0",
-    "hexo-theme-stellar": "1.44.0"
+    "hexo-theme-stellar": "2.0.0"
   },
   "devDependencies": {
     "cheerio": "^1.2.0",
