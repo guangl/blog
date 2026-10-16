@@ -153,11 +153,15 @@ sitemap('loc').each((_, element) => localTarget(sitemap(element).text(), site, '
 const sitemapUrls = sitemap('loc').toArray().map(element => sitemap(element).text().trim());
 report(sitemapUrls.length > 0, 'sitemap.xml has no URLs');
 report(sitemapUrls.includes(site.href), 'sitemap.xml is missing the homepage');
+// 重复 URL 会浪费抓取配额，IndexNow 也会把同一条提交两次；模板改动最容易在这里翻车。
+const duplicatedSitemapUrls = sitemapUrls.filter((url, index) => sitemapUrls.indexOf(url) !== index);
+report(duplicatedSitemapUrls.length === 0,
+  `sitemap.xml has duplicate URLs: ${[...new Set(duplicatedSitemapUrls)].join(', ')}`);
 const robotsText = readFileSync(resolve(output, 'robots.txt'), 'utf8');
 report(robotsText.includes(new URL('sitemap.xml', site).href), 'robots.txt has wrong sitemap URL');
 
-// robots.txt 的抓取策略：默认封禁、搜索引擎显式放行。改策略时这里的期望值要一起改。
-// 只做「组是否被整体封禁」的粗粒度判断，够用来拦住把策略改回全站放行的错误。
+// robots.txt 的抓取策略：默认封禁、搜索引擎与 AI 搜索放行、AI 训练与数据采集拒绝。
+// 改策略时这里的期望值要一起改；只做「组是否被整体放行/封禁」的粗粒度判断。
 function parseRobots(text) {
   const groups = [];
   let current = null;
@@ -193,6 +197,20 @@ for (const agent of ['googlebot', 'bingbot', 'baiduspider']) {
   const group = robotsGroup(agent);
   report(!!group && robotsAllowsAll(group) && !robotsBlocksAll(group),
     `robots.txt must allow the ${agent} search crawler`);
+}
+// 「可以引用我、不要拿去训练」是这份策略的核心取舍：AI 搜索与用户触发抓取放行，
+// AI 训练与数据采集继续拒绝。名单调整时这两组期望值必须同步。
+for (const agent of ['oai-searchbot', 'chatgpt-user', 'claude-searchbot', 'claude-user',
+  'perplexitybot', 'perplexity-user', 'meta-externalfetcher']) {
+  const group = robotsGroup(agent);
+  report(!!group && robotsAllowsAll(group) && !robotsBlocksAll(group),
+    `robots.txt must allow the ${agent} AI search crawler`);
+}
+for (const agent of ['gptbot', 'claudebot', 'ccbot', 'bytespider', 'google-extended',
+  'applebot-extended', 'meta-externalagent']) {
+  const group = robotsGroup(agent);
+  report(!!group && robotsBlocksAll(group),
+    `robots.txt must keep the ${agent} AI training crawler blocked`);
 }
 
 // 搜索引擎收录：站内只做“配置了就必须生效”的检查，没填的键不产生任何输出。
