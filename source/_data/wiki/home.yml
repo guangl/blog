@@ -1,4 +1,4 @@
-name: "guangluo's blog"
+name: "个人摄影学习之路"
 headline: 记录问题，也记录风景。
 tagline: 数据库 · 运维 · 生活
 description: 一名 DBA 的数据库管理与运维经验，还有镜头里值得留下的日常。
@@ -22,18 +22,8 @@ hero:
   background:
     image: /2026/09/13/hankou-river-beach/preview.jpg
     parallax: 0.2
-  # 与官方文档站首页一致：Hero 右侧放一个可复制的本地运行命令块。
-  preview:
-    type: terminal
-    commands:
-      - label: Hexo
-        codes: |
-          npm install -g hexo-cli
-          hexo server
-      - label: Bun
-        codes: |
-          bun install
-          bun run server
+  # Hero 右侧原来是「Hexo / Bun」本地运行命令块，按需求去掉：
+  # 不写 preview 时主题会走 without-preview 布局，Hero 只剩背景与标题。
   actions:
     - title: 文章归档
       url: /archives/
