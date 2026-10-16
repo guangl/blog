@@ -105,12 +105,20 @@ ssh-copy-id -i ~/.ssh/blog_deploy.pub root@<公网IP>
 - 只想发布其中一条：在 Actions 里手动触发对应工作流。
 - 回滚：`git revert` 后推送，或临时把 `SERVER_DEPLOY` 置为 `false` 停掉大陆通道。
 
-## 待办：备案号与百度收录
+## 备案号与百度收录
 
-备案通过后还需要补三处，目前都还没做：
+1. **页脚备案号（已接线）**：号码填进 `_config.yml` 的 `beian` 段就行——
 
-1. **页脚备案号**：展示 ICP 备案号并链接 <https://beian.miit.gov.cn>（硬性要求），公安联网备案号也一并展示；
-2. **百度搜索资源平台**：`_config.yml` 的 `seo.verification.baidu`、`tools/check-site.mjs` 的 meta 映射、`tools/ping-search.mjs` 的「普通收录」推送；
+   | 键 | 内容 |
+   | --- | --- |
+   | `beian.icp` | ICP 备案号，例如 `鄂ICP备2026000000号-1`，页脚会链接到 <https://beian.miit.gov.cn> |
+   | `beian.police` | 公安联网备案号，例如 `鄂公网安备42010000000000号` |
+   | `beian.police_url` | 可选，留空时用 <https://beian.mps.gov.cn> |
+
+   留空时页脚一行都不输出，所以本地开发、海外构建和 Cloudflare Pages 都不受影响；填了之后 `bun run verify` 会校验「必须出现在页脚、且 ICP 号必须链到工信部备案系统」。注入实现在 `scripts/beian.js`，走 `after_render:html`——主题的 `footer.content` 在初始化时就被 `Object.freeze` 冻结了，构建期追加不进去。
+
+2. **百度搜索资源平台（还没做）**：等拿到 token 后要补三处——`_config.yml` 的 `seo.verification.baidu`、`tools/check-site.mjs` 的 meta 映射、`tools/ping-search.mjs` 的「普通收录」推送。
+
 3. `docs/domain-deployment.md` 里的收录状态更新。
 
 ## 安全加固（可选，后续再做）
