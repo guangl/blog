@@ -83,4 +83,12 @@ Direct Upload 项目后续可使用 Wrangler 和 GitHub Actions 自动部署。C
 - 将 `https://blog.guangluo.top/sitemap.xml` 提交到搜索引擎站长平台。
 - 只维护 `blog.guangluo.top`，旧 GitHub Pages 地址停止更新。
 
+## 本地测试链路
+
+如果本机或局域网走软路由（Surge 等），确认本站被设为直连：代理会把大陆流量先绕到境外节点再访问 Cloudflare，凭空多一跳，测出来的延迟也就没有参考价值。
+
+规则片段见 [`surge-direct-rules.conf`](surge-direct-rules.conf)，复制进 Surge 配置的 `[Rule]` 段、放在 `FINAL` 之前即可。
+
+验证：`dig +short blog.guangluo.top` 不应再返回 `198.18.x.x`（fake-IP），并在 Surge 的请求面板确认该请求的 policy 是 `DIRECT`。
+
 参考：[Cloudflare Pages Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/)、[Pages 自定义域名](https://developers.cloudflare.com/pages/configuration/custom-domains/)。
