@@ -36,7 +36,7 @@ on:
         type: boolean
         default: false
       refresh:
-        description: 只重写 Nginx 配置（证书不用换；备案后切 HTTPS 用这个）
+        description: 只重写 Nginx 配置，不碰证书（手工改过配置时用）
         type: boolean
         default: false
       check:
@@ -196,8 +196,9 @@ jobs:
 
       # 证书换好了，但 Nginx 配置里引用的路径要跟着更新（首次申请时还要从「只走 HTTP」
       # 切到「HTTP 301 + HTTPS」）。这一步复用初始化脚本，它的 nginx -t 校验和回滚同样生效。
-      # 勾 refresh 也会走到这里：备案通过、解析切到本机之后，靠它把配置切到 HTTPS
-      # （在那之前脚本自己会判断域名还没指过来，继续用 HTTP + IP 直连，不会把入口弄没）。
+      # 勾 refresh 也会走到这里：只重写配置、不换证书（手工改过配置时让它恢复原样）。
+      # 配置本身是自适应的——按域名访问 80 上会 301 到 HTTPS，用 IP 直连则直接给页面，
+      # 所以备案前不用改它，备案后也不用再改一次。
       - name: Refresh the Nginx configuration
         if: steps.install.outputs.changed != '' || inputs.refresh == true
         run: |
