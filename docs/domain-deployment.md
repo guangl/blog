@@ -87,11 +87,11 @@ Direct Upload 项目后续可使用 Wrangler 和 GitHub Actions 自动部署。C
 
 ## 搜索引擎收录
 
-2026-10-17 实测：站点首次发布（2026-10-16）次日，Google 与百度都还没收录。搜狗、360、Bing、Brave 的 `site:` 查询均为 0 条，站长之家和爱站也查不到数据。抓取侧是正常的：`robots.txt` 对搜索引擎和 AI 搜索放行（策略是默认拒绝，只放行搜索引擎 + AI 搜索/用户触发抓取 + 社交预览 + RSS 阅读器 + 网页存档，AI 训练与数据采集仍拒绝，见 [README 的抓取策略一节](../README.md#抓取策略robotstxt)），`sitemap.xml` 有 23 条 URL，用 Googlebot 和 Baiduspider 的 UA 请求首页与文章页都返回 200。缺的是主动提交，以及指向本站的外链。上线后如果要真正拦住不遵守 robots.txt 的 AI 采集器，需要在 Cloudflare 侧开 AI Crawl Control 或加 WAF 规则。
+2026-10-17 实测：站点首次发布（2026-10-16）次日，Google 与百度都还没收录。搜狗、360、Bing、Brave 的 `site:` 查询均为 0 条，站长之家和爱站也查不到数据。抓取侧是正常的：`robots.txt` 对搜索引擎和 AI 搜索放行（策略是默认拒绝，只放行搜索引擎 + AI 搜索/用户触发抓取 + 社交预览 + RSS 阅读器 + 网页存档，AI 训练与数据采集仍拒绝，见 [README 的抓取策略一节](../README.md#抓取策略robotstxt)），`sitemap.xml` 覆盖了全部页面（条数随内容变化，别在文档里写死：`curl -s https://blog.guangluo.top/sitemap.xml | grep -c '<loc>'` 现查），用 Googlebot 和 Baiduspider 的 UA 请求首页与文章页都返回 200。缺的是主动提交，以及指向本站的外链。上线后如果要真正拦住不遵守 robots.txt 的 AI 采集器，需要在 Cloudflare 侧开 AI Crawl Control 或加 WAF 规则。
 
 同日复查的另一个结论：**脚本抓 Bing 搜索结果页查不出收录，结果不可信**。`https://www.bing.com/search?q=…` 对脚本客户端返回 200 和完整 HTML，但只对 `github`、`百度` 这类超热门查询给真实结果；`site:blog.guangluo.top`、`汉口江滩长曝光` 返回的是随机无关内容（同一个 `site:` 查询三次分别给出 Steam 论坛、DeepSeek 官网和漫画站），「结果数」在 83 / 144,000 / 243,000 之间乱跳。Cookie 会话、`mkt=zh-CN&cc=CN`、`format=rss`、`cn.bing.com` 都试过，行为一致，属 Bing 对无浏览器会话客户端的降级响应。要判断收录只能登录 Bing Webmaster Tools 做 URL 检查，或填上 `seo.verification.bing` 后走官方 API。
 
-当天用 IndexNow 做了第一次真实推送：`node tools/ping-search.mjs _config.domain.yml --strict` 把 `sitemap.xml` 里的 8 条 URL 提交给 `api.indexnow.org`，返回 200。抓取侧同时复核过：bingbot 的 UA 请求首页、`sitemap.xml`、`atom.xml` 和文章页全部 200，没有 Cloudflare 拦截。
+当天用 IndexNow 做了第一次真实推送：`node tools/ping-search.mjs _config.domain.yml --strict` 把当时 `sitemap.xml` 里的 8 条 URL 提交给 `api.indexnow.org`，返回 200。抓取侧同时复核过：bingbot 的 UA 请求首页、`sitemap.xml`、`atom.xml` 和文章页全部 200，没有 Cloudflare 拦截。
 
 仓库已把提交做成配置项，只有填了值才会产生输出：
 

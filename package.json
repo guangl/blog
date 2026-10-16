@@ -18,6 +18,11 @@
     "server:domain": "hexo server --config _config.yml,_config.domain.yml --port 4001",
     "seo:ping": "node tools/ping-search.mjs _config.domain.yml",
     "seo:ping:dry": "node tools/ping-search.mjs _config.domain.yml --dry-run",
+    "favicon": "node tools/make-favicon.mjs",
+    "images:compress": "node tools/optimize-images.mjs --write",
+    "images:report": "node tools/optimize-images.mjs",
+    "browser:a11y": "node tools/browser-check.mjs / /posts/ /examples/ /about/",
+    "browser:a11y:dark": "node tools/browser-check.mjs --dark / /posts/ /examples/ /about/",
     "deploy:domain": "bun run verify:domain && bunx wrangler@4.151.0 pages deploy public-domain --project-name guangluo-blog --branch main --commit-dirty=true"
   },
   "hexo": {
@@ -39,6 +44,7 @@
   },
   "devDependencies": {
     "cheerio": "^1.2.0",
-    "js-yaml": "^4.1.1"
+    "js-yaml": "^4.1.1",
+    "sharp": "^0.34.5"
   }
 }

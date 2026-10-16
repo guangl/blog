@@ -45,7 +45,10 @@ bun run clean
 - 全文 Atom 订阅：<https://blog.guangluo.top/atom.xml>。
 - 站点地图、robots.txt、规范链接、主题自带的 Open Graph 与结构化数据。
 - 搜索引擎收录支持：站长平台验证 meta、IndexNow 密钥文件、发布后自动推送（见 [SEO 与分享](#seo-与分享)）。
-- 本地图标与 404 插图；照片提供封面、正文预览图和原图入口。
+- 响应式图片：构建期给照片生成 JPEG / WebP / AVIF 多档变体，用 `<picture>` + `srcset` 按屏幕宽度取图（见 [图片](#图片)）。
+- 安全响应头与缓存策略：构建期生成 Cloudflare Pages 的 `_headers`，含 HSTS、CSP、Permissions-Policy（见 [响应头与缓存](#响应头与缓存)）。
+- 无障碍：每页恰好一个 `h1`、每张图都有 `alt`、首页 Hero 文字对比度 6.27:1（见 [无障碍](#无障碍)）。
+- 本地图标（`favicon.ico` 多尺寸 + `apple-touch-icon.png`）与 404 插图；照片提供封面、正文预览图和大图入口。
 - 文章和页脚使用与仓库一致的 CC BY 4.0 协议。
 
 ## 写文章
@@ -68,9 +71,70 @@ description: 一两句话说明文章内容，也作为列表摘要。
 cover: /2026/10/16/文章标题/cover.jpg
 ```
 
-图片放在同名资源目录中，正文可使用 `![说明](preview.jpg)` 引用。封面填写以 `/` 开头的站内公开路径。图片较大时建议单独准备预览图，原图可通过普通链接提供。现有摄影文章保留了 `main.jpg` 原图。
+图片放在同名资源目录中，正文可使用 `![说明](preview.jpg)` 引用。封面填写以 `/` 开头的站内公开路径。正文里显示的那张图建议单独准备一份（例如 1600px 长边的 `preview.jpg`），大图用普通链接挂在图上，例如 `[![说明](preview.jpg)](main.jpg)`——链接目标不会进入 `srcset`，所以不必为它准备变体。
 
-站点时区为 `Asia/Shanghai`；未来日期的内容不会提前发布。修改文章时手动更新 `updated`，避免每次部署把旧文章误标为刚刚更新。
+站点时区为 `Asia/Shanghai`；未来日期的内容不会提前发布（`future: false`），日期写到明天就会「生成了但产物里没有」，排查时先看这个。修改文章时手动更新 `updated`，避免每次部署把旧文章误标为刚刚更新。
+
+## 图片
+
+照片是本站的主体，构建期由 `scripts/image-pipeline.js` 统一处理，**不需要手工导出多份尺寸**：只要把图放进文章资源目录，构建时会按 `480 / 960 / 1600`（超过 2560 的源图封顶 2560）生成 JPEG / WebP / AVIF 变体，写进产物目录（`public/` 与 `public-domain/` 都不提交进仓库），并把正文里的 `<img>` 改写成 `<picture>`：
+
+- 浏览器支持 AVIF 就用 AVIF，其次 WebP，最后才回退 JPEG；
+- `<source>` 带 `srcset` + `sizes`，手机不会去下 1600px 的图；
+- `img` 上补了 `width` / `height`，避免图片加载完把正文顶下去（CLS）；
+- 装饰性大图（首页 Hero、文章页头图）改为 `loading="eager"` + `fetchpriority="high"`——它们通常就是 LCP 元素，延后加载只会更慢；
+- 主题自带的懒加载在这里被接管：`.lazy` 类与 `data-src` 会被去掉，改用原生 `loading="lazy"`。原因是 `<picture>` 的 `<source>` 一旦被浏览器选中，再改 `<img src>` 就没用了，两套机制会打架。
+
+只处理「页面上真的用 `<img>` 显示出来」的图。正文里 `[![…](preview.jpg)](main.jpg)` 的链接目标（`main.jpg`）不生成变体——为一张 7008px 的原图编码 4K AVIF 是纯浪费。实测效果：正文图在手机上从 137KB 降到 9.4KB，列表页封面从 60KB 降到 4KB。
+
+主题自带的图片预处理（`features.image_optimization`，默认开启）在 `_config.stellar.yml` 里被显式关掉了：它会在 `after_generate` 扫产物、用 sharp 算尺寸与平均色存进 `source/_data/caches/images_metadata.json`，遇到本站生成的变体路径会报「Local image route not found」并白跑一遍分析。尺寸与懒加载由上面的管线负责，两者同时开只会互相打架。
+
+`source/` 里的**原图**不会被自动改动。想压小体积用：
+
+```bash
+bun run images:report     # 只报告：哪些图过大、能省多少
+bun run images:compress   # 真正重压（长边 >3840 或 >1.5MB 的 JPEG）
+```
+
+现有那张 `main.jpg` 已经从 7008×4672 / 4.08MB 压到 3840×2560 / 0.44MB（省 90%），所以正文里的说法是「查看大图」而不是「查看原图」——真正未压缩的原始文件在 Git 历史里（`git log --follow -- source/_posts/hankou-river-beach/main.jpg`）。
+
+## 无障碍
+
+`scripts/a11y.js` 在构建期做三件事，都是实测产物发现的问题：
+
+1. **每页恰好一个 `h1`**。主题在首页会同时输出两个：Hero 大标题和页面标题「欢迎来访」。规则是「保留第一个、其余降级为 `h2`」——首页保留 Hero 大标题，关于 / 订阅 / 组件示例这类只有页面标题的页面不受影响。降级不改外观：主题的标题样式挂在 `.title` 类上，与标签名无关（自检会核对降级后仍是 25px）。
+2. **列表页补 `h1`**。`/posts/`、`/archives/`、`/categories/*`、`/tags/*` 原本一个 `h1` 都没有。这里按 canonical 路径推一个语义标题（如「标签：武汉」「2026 年 9 月归档」），插在 `<main>` 开头并用 clip 技巧做**视觉隐藏**——不是 `display:none`，那样会被无障碍树忽略，等于没加。
+3. **图片补 `alt`**。卡片封面用同一张卡片里的文章标题；背景类图片（`class` 含 `bg`、位于 `aria-hidden` 容器内）与拿不到标题的一律 `alt=""`（明确表示装饰性，与「完全没有 `alt`」在无障碍树里是两回事）。
+
+首页 Hero 的**对比度**是单独处理的，见 `_config.stellar.yml` 的 `inject.head_end`。主题只为视频 / 动效英雄加遮罩，图片英雄只有一层「底部渐隐到页面底色」，标题、简介和按钮直接压在照片上；无头 Chrome 实测修之前小字只有 2.56:1（WCAG AA 需要 4.5:1）。现在的做法是在模糊层与渐隐层之间插一层 `rgba(0,0,0,.30)` 遮罩，并把 Hero 文字一律钉成白色（用 `!important` 压过主题 adaptive-text 写在元素上的内联变量，否则换一张照片就可能翻到低对比度那一侧）。修完实测 6.27:1（主按钮反色后 21:1），浅色与深色外观都达标。
+
+⚠️ 遮罩保证的是「当前这张照片」。换成天空占比更大、整体更亮的照片时同一层遮罩可能不够，务必重新量一次（见下）。
+
+### 本地核对无障碍与 CSP
+
+`tools/browser-check.mjs` 会用无头 Chrome 打开产物页面并回传实测数据：
+
+```bash
+bun run browser:a11y         # 浅色外观检查首页 / 列表页 / 组件示例页 / 关于页
+bun run browser:a11y:dark    # 深色外观
+node tools/browser-check.mjs --shot /tmp/page-{page}.png /   # 顺便存一张截图
+```
+
+它做的是纯文本自检做不到的事：把每段压在照片上的文字**先隐藏再截图**、取文字背后区域的平均亮度算真实对比度（标题是大字门槛 3:1，简介和按钮是小字门槛 4.5:1）；统计 `h1` 数量、缺 `alt` 的图、**裂图**（`naturalWidth === 0`）；并回报控制台错误与 **CSP 违规**。它会按 `_headers` 的规则起本地服务，所以能提前验证响应头会不会把站点自己的资源挡掉——MathJax 的公式字形来自 cdnjs，`font-src` 漏一个域名就是一堆豆腐块，这个脚本第一次跑就抓到了这个问题。它需要本机有 Chrome 和 sharp，属于本地工具，不进 CI。
+
+## 响应头与缓存
+
+Cloudflare Pages 的 `_headers` 由 `scripts/cloudflare-headers.js` 在构建期写进产物根目录。**不能直接放 `source/_headers`**：Hexo 会忽略 `source/` 下以 `_` 开头的文件和目录，那个文件根本不会被复制进产物。
+
+`/*` 上挂着安全头：`Strict-Transport-Security`（一年，含子域，暂不进 preload）、`Content-Security-Policy`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy`、`Cross-Origin-Resource-Policy`。CSP 里必须显式放行主题运行时按需加载的第三方来源：`gcore.jsdelivr.net`（mermaid / marked / vanilla-lazyload）、`unpkg.com`（swiper）、`cdnjs.cloudflare.com`（MathJax，含 `font-src`），以及拉取 GitHub 仓库信息的 `connect-src api.github.com`。CSP 目前含 `'unsafe-inline'`（主题有内联脚本与构建期注入的内联样式），它挡不住内联脚本注入，但仍能挡住「本站没有放行的外部来源」。
+
+缓存策略给 CSS / JS / 图片一周的 `stale-while-revalidate`，`sitemap.xml` / `atom.xml` / `search.json` / `robots.txt` 一小时。这里有两条 Cloudflare 的规则在约束写法，别按直觉改：
+
+1. **`*` 是贪婪通配，能跨 `/` 匹配**（官方文档：a splat will greedily match all characters），所以 `/*.jpg` 能覆盖到 `2026/09/13/<slug>/cover.jpg` 这种深层路径。
+2. **同一个头命中多条规则时，值会用逗号拼在一起**。所以 `/*` 上**不能**再写 `Cache-Control`，否则会和 `/*.css` 之类的规则拼成 `public, max-age=0, …, public, max-age=86400, …` 这种语义不明的东西；HTML 用 Cloudflare Pages 的默认值（实测 `public, max-age=0, must-revalidate`，正是文档页想要的）。同理，各条缓存规则之间不能有交集，图标 JSON 用 `/js/icons/*`、搜索索引用精确路径，而不是 `/*.json`。
+3. 一个项目最多 **100 条**规则（现在是 15 条），`tools/check-site.mjs` 会守住这几条约定。
+
+**第二条通道（腾讯云 ECS + Nginx）不认 `_headers` 文件**，安全头是在 `deploy/server-setup.sh` 的 Nginx 模板里另写一遍的（`add_header`）。两处的 CSP 字符串必须逐字符相同，`tools/check-site.mjs` 会直接比对这两份，改一处忘了另一处就会构建失败。Nginx 那边还有两点不同：缓存用 `expires -1` / `expires 30d` 表达同一套意图；HSTS 是**故意没开**的（见脚本里的注释——等 HTTPS 稳定跑一段时间再加），所以大陆通道目前比 Cloudflare 通道少一条 HSTS。
 
 ## 验证与发布
 
@@ -79,6 +143,14 @@ bun run verify
 ```
 
 此命令清理并构建站点，然后检查本地链接与资源、必要页面、规范链接、搜索索引、Atom、站点地图和版权协议。只检查已有生成结果时运行 `bun run check`。
+
+自检里还有几组「配置了就必须生效」的硬约束，都是踩过坑之后加的：每页恰好一个 `h1`、每张图都有 `alt`、`<picture>` 必须带 `srcset` 与尺寸、`_headers` 的安全头与缓存规则齐全、`favicon.ico` / `apple-touch-icon.png` / `/examples/` 必须在产物里、站点地图不许有重复 URL。改这些地方时别把自检一起改松——它失败是有原因的。
+
+```bash
+bun run verify:domain     # 生成并验证 Cloudflare 上传目录 public-domain/
+bun run check             # 只检查已有产物
+bun run browser:a11y      # 无头 Chrome 实测对比度、裂图、CSP（本地工具）
+```
 
 Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建并发布到 Cloudflare Pages。Cloudflare 自动发布需要先添加仓库 Secret `CLOUDFLARE_API_TOKEN`，设置方法见 [域名部署说明](docs/domain-deployment.md)。检查通过后才会发布。`bun run deploy` 尚未配置 Hexo 部署适配器。
 
@@ -89,11 +161,18 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 | 内容 | 文件 |
 | --- | --- |
 | 站点标题、URL、时区和订阅 | `_config.yml` |
-| 顶部导航、外观、文章功能和页脚 | `_config.stellar.yml` |
+| 顶部导航、外观、文章功能、页脚、head 注入 | `_config.stellar.yml` |
 | 欢迎语和侧栏组件 | `source/_data/widgets.yml` |
 | 关于与订阅说明 | `source/about/`、`source/subscribe/` |
 | 首页大图、文档树、介绍和入口 | `source/_data/wiki/home.yml`、`source/index.md` |
+| 公式 / 图表 / 时间线的验证页 | `source/examples/index.md` |
 | 订阅正文的相对资源路径与版权 | `templates/atom.xml` |
+| 响应式图片与变体生成 | `scripts/image-pipeline.js` |
+| 安全响应头与缓存策略 | `scripts/cloudflare-headers.js` |
+| `h1` / `alt` 等无障碍修正 | `scripts/a11y.js` |
+| 图标文件生成 | `tools/make-favicon.mjs` |
+| 产物自检的硬约束 | `tools/check-site.mjs` |
+| 对比度 / 裂图 / CSP 实测 | `tools/browser-check.mjs` |
 
 ## 关于专栏与笔记本
 
@@ -115,7 +194,9 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 
 ## 公式、图表与时间线
 
-三者用法见 `/examples/`（`source/examples/index.md`），那也是它们的验证页。
+三者用法见 `/examples/`（`source/examples/index.md`），那也是它们的验证页；示例内容按摄影主题写（互易律、超焦距、拍摄流程），既当测试页也当随手备忘。这一页在 2026-10-17 曾随「只留摄影内容」一起被删掉，后来发现 `scripts/math-protect.js` 与 `scripts/mermaid-blocks.js` 就没了任何页面在用，于是从 Git 历史恢复并改写；`tools/check-site.mjs` 现在把 `examples/index.html` 列为必查页面，免得再次出现「脚本还在、页面没了」。
+
+写这一页时踩到一个坑：`date` 写成了当天中午，而当时是清晨，`future: false` 直接让它不生成——页面文件在 `source/` 里却不出现在产物中，先查日期。
 
 **公式**用 `$...$` 行内、`$$...$$` 行间。`hexo-renderer-marked` 会破坏 LaTeX，所以由 `scripts/math-protect.js` 在构建期处理：把公式里的 `\,` `\;` `\:` `\!`（CommonMark 的可转义标点，会被吃掉）换成数学模式等价的 `\mkern{3,5,4,-3}mu`，把 `$$` 块先抽成占位标记避免被拆行，渲染后再还原。MathJax 由插件按页注入，只有含公式的页面才加载。
 
@@ -198,9 +279,24 @@ bun run seo:ping       # 推送 IndexNow
 
 ## 脚本与注入
 
-`scripts/` 下两个构建期插件（公式、图表）都只在生成静态文件时运行，不会发给访客。`scripts/seo-fixes.js` 修正结构化数据与社交卡片，`scripts/seo-indexing.js` 只输出站长平台验证 meta 和 IndexNow 密钥文件；两者都不改变抓取结果以外的行为。唯一的样式注入是 `_config.stellar.yml` 里的 `inject.head_end`：它给首页 Hero 的**图片**背景补一层轻遮罩。主题只为「视频 / 动效」英雄加遮罩，图片英雄不加，而汉口江滩这张照片的天空很亮，白色标题在浅色和深色下的对比度都只有 2.2:1；补遮罩后标题为 3.4:1、简介为 5.1:1，达到 WCAG AA。选择器沿用主题原始的 `.cover-content.wiki-hero .wiki-cover-background.image .wiki-cover-background-overlay` 以覆盖默认值，作用范围只限首页图片英雄。
+`scripts/` 下的构建期插件只在生成静态文件时运行，不会发给访客：
 
-`tools/check-site.mjs` 仅在构建时检查生成结果，不会发给访客。主题自身仍会加载其 CSS 和 JavaScript。当前沿用主题默认 viewport 设置，包括 `maximum-scale=1`，没有额外改写主题输出。
+| 脚本 | 作用 |
+| --- | --- |
+| `math-protect.js` / `mermaid-blocks.js` | 公式与图表的构建期处理（见上一节） |
+| `image-pipeline.js` | 生成图片变体、把 `<img>` 改写成 `<picture>`（见 [图片](#图片)） |
+| `a11y.js` | `h1` 归一、列表页补标题、图片补 `alt`（见 [无障碍](#无障碍)） |
+| `cloudflare-headers.js` | 生成 `_headers`（见 [响应头与缓存](#响应头与缓存)） |
+| `seo-fixes.js` / `seo-indexing.js` | 修正结构化数据与社交卡片；输出站长平台验证 meta 与 IndexNow 密钥文件 |
+| `beian.js` | 备案号页脚，留空时完全不输出 |
+| `canonical-notice.js` | 关掉主题的「非法克隆站 / 官方备用站」浮层 |
+| `lazy-images.js` | 给已经有真实 `src` 的图补原生 `loading` / `decoding` |
+
+`_config.stellar.yml` 的 `inject.head_end` 负责两件事：图标链接（`favicon.ico` 与 `apple-touch-icon.png`）和首页 Hero 的对比度修正。
+
+Hero 这段是**纠错后重写的**，值得记一笔：README 原先声称「图片英雄没有遮罩、已通过 `inject.head_end` 补到 3.4:1 / 5.1:1」，但 `git log -S 'inject:' -- _config.stellar.yml` 显示这个配置**从来没有存在过**，它引用的选择器 `.wiki-cover-background-overlay` 在 Stellar 2.0 的图片英雄里也已改写成「底部渐隐到底色」的纯渐变。也就是说这条「已修复」是假的。2026-10-17 用无头 Chrome 重新实测：小字（简介、导航、按钮）2.56:1，大标题 3.6:1。真正修好后的数字是全部 6.27:1（主按钮反色后 21:1），做法是在模糊层与渐隐层之间插一层 `rgba(0,0,0,.30)` 伪元素遮罩，并把 Hero 文字用 `!important` 一律钉成白色。改完记得用 `bun run browser:a11y` 复量。
+
+`tools/check-site.mjs` 与 `tools/browser-check.mjs` 都只在本地/CI 检查产物，不会发给访客。主题自身仍会加载其 CSS 和 JavaScript。当前沿用主题默认 viewport 设置，包括 `maximum-scale=1`，没有额外改写主题输出。
 
 `verify` 和 `verify:domain` 都会先执行 `hexo stellar doctor`，再构建并检查站点。迁移参考：[官方 v2 迁移指南](https://xaoxuu.com/wiki/stellar/migration/v1-to-v2/)、[原生 Hero 配置](https://xaoxuu.com/wiki/stellar/guides/wiki/)。
 
@@ -209,6 +305,7 @@ bun run seo:ping       # 推送 IndexNow
 - [Hexo](https://hexo.io/)：静态博客生成器
 - [Stellar](https://github.com/xaoxuu/hexo-theme-stellar)：博客主题
 - [Bun](https://bun.sh/)：JavaScript 运行时和包管理器
+- [sharp](https://sharp.pixelplumbing.com/)：构建期的图片编码（主题本来就用它，这里是显式声明为 devDependency）
 - Cloudflare Pages：静态网站托管与自动发布
 
 ## 许可证

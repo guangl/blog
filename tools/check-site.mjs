@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { resolve, relative, sep } from 'node:path';
+import { resolve, relative, sep, dirname } from 'node:path';
 import { load } from 'cheerio';
 import yaml from 'js-yaml';
 import hexoUtil from 'hexo-util';
@@ -52,8 +52,9 @@ function localTarget(value, base, context) {
 
 assert(existsSync(output), 'Run bun run build before checking the site.');
 for (const path of ['index.html', 'posts/index.html', 'about/index.html', 'subscribe/index.html', 'archives/index.html',
-  'categories/index.html', 'tags/index.html',
-  '404.html', 'atom.xml', 'search.json', 'sitemap.xml', 'robots.txt']) {
+  'categories/index.html', 'tags/index.html', 'examples/index.html',
+  '404.html', 'atom.xml', 'search.json', 'sitemap.xml', 'robots.txt',
+  'favicon.ico', 'apple-touch-icon.png', '_headers']) {
   report(existsSync(resolve(output, path)), `Missing required page: ${path}`);
 }
 
@@ -78,9 +79,33 @@ for (const file of pages) {
     report(Boolean(homeHeadline) && $('.wiki-hero h1').text().trim() === homeHeadline,
       'Native homepage hero is missing or does not show the configured headline');
     report($('.wiki-hero a[href="#start"]').length > 0 && $('#start').length === 1, 'Homepage reading anchor is missing');
+    // `inject.head_end` 里的图标链接与 Hero 对比度遮罩，删了就要在这里报出来
+    report($('link[rel="icon"][href="/favicon.ico"]').length === 1, 'Homepage is missing the /favicon.ico icon link');
+    report($('link[rel="apple-touch-icon"][href="/apple-touch-icon.png"]').length === 1,
+      'Homepage is missing the apple-touch-icon link');
+    report(raw.includes('--text-banner: #fff !important'),
+      'Homepage is missing the hero contrast override (inject.head_end)');
   }
   report($('main, [role="main"]').length === 1, `${path}: missing main landmark`);
   report(($('meta[name="viewport"]').attr('content') || '').includes('width=device-width'), `${path}: missing responsive viewport`);
+  // 无障碍：每页恰好一个 h1（scripts/a11y.js 负责把多出来的降级成 h2、
+  // 给列表页补视觉隐藏的 h1），且每张图都必须有 alt 属性——alt="" 表示装饰性图片，
+  // 与「完全没有 alt」在无障碍树里是两回事。
+  const h1List = $('h1');
+  report(h1List.length === 1, `${path}: expected exactly one h1, found ${h1List.length}`);
+  const imagesWithoutAlt = $('img').filter((_, image) => $(image).attr('alt') === undefined);
+  report(imagesWithoutAlt.length === 0,
+    `${path}: ${imagesWithoutAlt.length} image(s) without an alt attribute`);
+  // 图片优化管线：改写过的图必须是 <picture> + srcset，且带尺寸（避免 CLS）
+  $('picture > img').each((_, image) => {
+    const $image = $(image);
+    report(Boolean($image.attr('srcset')), `${path}: <picture> img without srcset: ${$image.attr('src')}`);
+    report(Boolean($image.attr('width')) && Boolean($image.attr('height')),
+      `${path}: <picture> img without width/height: ${$image.attr('src')}`);
+    report($(image).attr('loading') === 'lazy' || $(image).attr('loading') === 'eager',
+      `${path}: <picture> img without native loading: ${$image.attr('src')}`);
+    report(!$image.attr('data-src'), `${path}: <picture> img still carries the theme's data-src`);
+  });
   // SEO：作者 CDN 的占位图不应出现在页面里（应使用本站 fallbacks.cover / avatar）
   report(!raw.includes('cdn-x/placeholder'), `${path}: references theme author placeholder CDN`);
   // SEO：结构化数据的图片必须是绝对 URL，schema.org 不接受相对路径
@@ -213,6 +238,63 @@ for (const agent of ['gptbot', 'claudebot', 'ccbot', 'bytespider', 'google-exten
     `robots.txt must keep the ${agent} AI training crawler blocked`);
 }
 
+// Cloudflare Pages 的 `_headers`（scripts/cloudflare-headers.js 生成）。
+// 这里守几条容易悄悄改坏的约定：
+//   - 安全头必须挂在 `/*` 上；
+//   - CSP 必须放行主题运行时按需加载的第三方来源（漏一个，线上就是排版/图表失效）；
+//   - `/*` 上不允许出现 Cache-Control —— Cloudflare 会把命中多条规则的同一个头
+//     用逗号拼起来，`/*` 再写一条就会和资源规则拼出语义不明的值；
+//   - 规则总数不能超过 Cloudflare 的 100 条上限。
+const headersText = readFileSync(resolve(output, '_headers'), 'utf8');
+const headerBlocks = headersText.split(/\n\s*\n/).map(block => {
+  const lines = block.split(/\r?\n/).filter(line => line.trim() && !line.trim().startsWith('#'));
+  const [pattern, ...rest] = lines;
+  const headers = {};
+  for (const line of rest) {
+    const separator = line.indexOf(':');
+    if (separator > 0) headers[line.slice(0, separator).trim().toLowerCase()] = line.slice(separator + 1).trim();
+  }
+  return { pattern: (pattern || '').trim(), headers };
+}).filter(block => block.pattern);
+const catchAll = headerBlocks.find(block => block.pattern === '/*');
+report(Boolean(catchAll), '_headers is missing the catch-all /* block');
+if (catchAll) {
+  for (const name of ['strict-transport-security', 'content-security-policy', 'x-content-type-options',
+    'x-frame-options', 'referrer-policy', 'permissions-policy']) {
+    report(Boolean(catchAll.headers[name]), `_headers: /* is missing ${name}`);
+  }
+  report(!catchAll.headers['cache-control'],
+    '_headers: /* must not set Cache-Control (Cloudflare comma-joins overlapping rules)');
+  const csp = catchAll.headers['content-security-policy'] || '';
+  for (const token of ["default-src 'self'", "frame-ancestors 'none'", "object-src 'none'",
+    'https://gcore.jsdelivr.net', 'https://unpkg.com', 'https://cdnjs.cloudflare.com',
+    'connect-src \'self\' https://api.github.com']) {
+    report(csp.includes(token), `_headers: CSP is missing ${token}`);
+  }
+  // MathJax 的字形从 cdnjs 拉，font-src 漏了就是一堆豆腐块
+  report(/font-src[^;]*cdnjs\.cloudflare\.com/.test(csp), '_headers: CSP font-src does not allow MathJax fonts');
+}
+for (const pattern of ['/*.css', '/*.js', '/*.jpg', '/*.webp', '/*.avif']) {
+  report(headerBlocks.some(block => block.pattern === pattern && block.headers['cache-control']),
+    `_headers: missing Cache-Control for ${pattern}`);
+}
+report(headerBlocks.length <= 100, `_headers has ${headerBlocks.length} rules, Cloudflare allows 100`);
+
+// 第二条通道（腾讯云 ECS + Nginx）不认 `_headers` 文件，安全头是在
+// deploy/server-setup.sh 的 Nginx 模板里另写一遍的。两处的 CSP 字符串必须逐字符相同，
+// 否则同一个站点在两条通道上的策略会悄悄分叉。这里直接比对。
+const nginxConfig = readFileSync('deploy/server-setup.sh', 'utf8');
+const nginxCsp = /add_header Content-Security-Policy "([^"]+)"/.exec(nginxConfig);
+report(Boolean(nginxCsp), 'deploy/server-setup.sh is missing the Nginx Content-Security-Policy header');
+if (nginxCsp && catchAll) {
+  report(nginxCsp[1] === catchAll.headers['content-security-policy'],
+    'CSP differs between scripts/cloudflare-headers.js and deploy/server-setup.sh');
+}
+for (const header of ['X-Frame-Options', 'Permissions-Policy', 'Cross-Origin-Resource-Policy']) {
+  report(new RegExp(`add_header ${header} "`).test(nginxConfig),
+    `deploy/server-setup.sh is missing the Nginx ${header} header`);
+}
+
 // 搜索引擎收录：站内只做“配置了就必须生效”的检查，没填的键不产生任何输出。
 // 百度搜索资源平台的那条验证等域名备案后再加进 seoMeta。
 const seo = config.seo || {};
@@ -248,6 +330,21 @@ if (icp) {
 const police = (beian.police || '').trim();
 if (police) {
   report(homepage.html().includes(police), `Homepage is missing the police filing number: ${police}`);
+}
+
+// README 与文档之间用相对路径互相引用。这些链接不参与站点构建，所以断了也没人会发现；
+// 2026-10-17 就出现过 docs/ 整个目录从工作区消失、而所有检查照常通过的情况。
+// 这里把「仓库内的文档链接」也纳入自检。
+for (const doc of ['README.md', 'docs/domain-deployment.md', 'docs/mainland-hosting.md']) {
+  if (!existsSync(doc)) {
+    errors.push(`Missing documentation file: ${doc}`);
+    continue;
+  }
+  const text = readFileSync(doc, 'utf8');
+  for (const match of text.matchAll(/\]\((?!https?:|#|mailto:)([^)#\s]+\.(?:md|yml|sh|js|mjs|conf|txt))/g)) {
+    const target = resolve(dirname(doc), decodeURIComponent(match[1]));
+    report(existsSync(target), `${doc}: link points at a missing file: ${match[1]}`);
+  }
 }
 
 if (errors.length) {

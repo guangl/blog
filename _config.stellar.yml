@@ -97,10 +97,11 @@ profiles:
       widgets: [tree, related]
     rightbar:
       widgets: [toc]
+  # 专栏（topic）与笔记本（notebooks）两套栏目已随内容一起移除（2026-10-17）：
+  # 站点只保留摄影内容，_posts/ 与归档、分类、标签足够承载。
+  # 需要时按 Stellar 官方文档把这两段配置和对应的 _data 文件加回来即可。
   wiki_index:
     path: null
-  # 专栏与笔记本两个栏目已随内容一起移除（2026-10-17）：
-  # 站点只保留摄影内容，_posts/ 与归档、分类、标签足够承载。
     rightbar:
       widgets: [toc]
   error:
@@ -188,6 +189,15 @@ features:
   lazy_loading:
     transition: fade
     auto_aspect_ratio: true
+  # 主题自带的图片预处理：扫页面里的 <img>，用 sharp 算尺寸与平均色，结果存到
+  # source/_data/caches/images_metadata.json。**默认是开的**（主题 _config.yml 里
+  # enabled: true），本站要显式关掉——图片已经由 scripts/image-pipeline.js 接管：
+  # 尺寸写成 <picture> 里 img 的 width/height，懒加载改用原生 loading，
+  # 不再需要「平均色占位图」那套。两者同时开会互相打架：主题在 after_generate
+  # 扫产物时遇到本站生成的变体路径（那是磁盘文件、不是 Hexo 路由），
+  # 每个变体都会报一条「Local image route not found」并白跑一遍 sharp 分析。
+  image_optimization:
+    enabled: false
 
 appearance:
   preset: minimal
@@ -209,3 +219,49 @@ fallbacks:
   # 未设置封面的文章在结构化数据、链接卡片等处使用的默认图。
   # 主题默认指向作者 CDN 的占位图，这里换成自己的图（1200×630，适合社交卡片）。
   cover: /images/cover.jpg
+
+# 注入到 </head> 之前的两件事：图标链接 + 首页 Hero 对比度修正。
+##
+## 图标：主题只在 head 里输出 `<link rel="shortcut icon" href="/images/favicon.svg">`。
+## 现代浏览器认这条，但 RSS 阅读器、旧浏览器和第三方工具常直接请求根目录的
+## `/favicon.ico`，所以补一条指向多尺寸 .ico 的链接，并给 iOS 书签一个
+## apple-touch-icon（180×180，不带透明像素，否则 iOS 会垫成黑底）。
+## 两个文件由 `bun run favicon` 从 source/images/favicon.svg 生成，产物提交进仓库。
+##
+## Hero 对比度：主题只为视频 / 动效英雄加遮罩，图片英雄只有一层「底部渐隐到页面底色」，
+## 标题、简介和按钮直接压在照片上。2026-10-17 用无头 Chrome 实测首页：
+##   修之前：小字（简介、导航、四个按钮）2.56:1，WCAG AA 需要 4.5:1 —— 不达标；
+##           大标题 3.6:1，大字门槛 3:1，勉强达标。
+##   修之后：全部 6.27:1（主按钮反色后 21:1），浅色与深色外观都达标。
+##
+## 两处一起改：
+##   1. 在模糊层（z-index 1）和主题自己的渐隐层（z-index 3）之间插一层半透明黑遮罩，
+##      不覆盖主题原有的「底部渐隐」效果。取 .30 是「照片还看得清」与「对比度留余量」
+##      之间折中的结果：.42 能到 8:1，但照片明显发闷。
+##   2. 把 Hero 里的文字颜色一律钉成白色。主题的 adaptive-text 会按图片平均色
+##      在白 / 黑之间自动选色，落到哪一侧取决于照片内容；这里用 !important 压过它
+##      写在元素上的内联变量，让对比度只由遮罩决定，换照片也不会突然翻车。
+##
+## ⚠️ 遮罩保证的是「这张照片」。换成天空占比更大、整体更亮的照片时，同一层遮罩可能
+## 不够——务必重新量：`node tools/browser-check.mjs /` 打印每段 Hero 文字的实测对比度，
+## 深色外观加 `--dark`。极端情况要把 .30 调大。刻意不写进 check-site：那需要在 CI 里
+## 跑无头浏览器，代价大于收益。
+inject:
+  head_end: |
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <style>
+      .cover-content.wiki-hero .wiki-cover-background.image::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+        background: rgba(0, 0, 0, .30);
+      }
+      .cover-content.wiki-hero,
+      .cover-content.wiki-hero * {
+        --text-banner: #fff !important;
+        --text-banner-theme: #fff !important;
+      }
+    </style>
