@@ -110,8 +110,9 @@ jobs:
           fi
           node -e '
             const plan = JSON.parse(require("node:fs").readFileSync(".cert-plan.json", "utf8"));
+            const labels = { renewed: "申请了新的", reused: "复用现有", failed: "失败", check: "只检查", plan: "试运行" };
             const lines = plan.domains.map(d =>
-              `| \`${d.domain}\` | ${d.action} | ${d.daysLeft ?? "-"} | ${d.certificateId ? `\`${d.certificateId}\`` : "-"} |`);
+              `| \`${d.domain}\` | ${labels[d.action] || d.action} | ${d.daysLeft ?? "-"} | ${d.certificateId ? `\`${d.certificateId}\`` : "-"} |`);
             const summary = [
               "### 证书续期",
               "",
@@ -125,13 +126,14 @@ jobs:
             for (const d of plan.domains) {
               if (d.error) console.log(`::warning::${d.domain}：${d.error}`);
             }
+            require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, `prepared=${plan.prepared.join(" ")}\n`);
             require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, `renewed=${plan.renewed.join(" ")}\n`);
             require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, `failed=${plan.failed.join(" ")}\n`);
             require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, `domains=${plan.domains.map(d => d.domain).join(" ")}\n`);
           '
 
       - name: Install SSH key
-        if: steps.plan.outputs.renewed != '' || inputs.refresh == true
+        if: steps.plan.outputs.prepared != '' || inputs.refresh == true
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
@@ -144,14 +146,31 @@ jobs:
           }
 
       # 一个域名一张免费证书（免费证书是单域名，不能像 Let's Encrypt 那样一张带三个 SAN），
-      # 所以这里逐个域名：先 rsync 到服务器上的暂存目录，再由 install-cert.sh 原子换进
-      # /etc/nginx/ssl/<域名>/——换完跑 nginx -t，不通过就回滚，不会把线上打挂。
+      # 所以这里逐个域名。**先比指纹再决定动没动服务器**：脚本每周都会把账号里当前那份证书
+      # 取回来，但服务器上已经装着同一份时就没必要 rsync、没必要 reload——这样定时任务
+      # 平时是真·空转，只有证书换了（或第一次装）才动手。同时还修掉一种情况：
+      # 在腾讯云控制台手动签好了、服务器上却没有，跑一次就能装上。
       - name: Install certificates on the server
-        if: steps.plan.outputs.renewed != ''
+        id: install
+        if: steps.plan.outputs.prepared != ''
         run: |
           set -euo pipefail
-          for domain in ${{ steps.plan.outputs.renewed }}; do
+          changed=''
+          for domain in ${{ steps.plan.outputs.prepared }}; do
             echo "::group::$domain"
+            local_fp=$(openssl x509 -in ".cert-out/$domain/fullchain.pem" -noout -fingerprint -sha256 | cut -d= -f2)
+            echo "本地这一份：$local_fp"
+            echo "  主体：$(openssl x509 -in ".cert-out/$domain/fullchain.pem" -noout -subject | sed 's/^subject=//')"
+            echo "  覆盖：$(openssl x509 -in ".cert-out/$domain/fullchain.pem" -noout -text | grep -o 'DNS:[^,]*' | tr '\n' ' ')"
+            remote_fp=$(ssh -p "$SERVER_PORT" -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
+              "$SERVER_USER@$SERVER_HOST" \
+              "openssl x509 -in /etc/nginx/ssl/$domain/fullchain.pem -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2" || true)
+            if [ "$remote_fp" = "$local_fp" ]; then
+              echo "服务器上已经是同一份，跳过安装"
+              echo "::endgroup::"
+              continue
+            fi
+            echo "服务器上是：${remote_fp:-（没有证书）} → 装新的"
             ssh -p "$SERVER_PORT" -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
               "$SERVER_USER@$SERVER_HOST" "mkdir -p '$STAGING_PATH/$domain'"
             rsync --archive --delete --human-readable \
@@ -162,15 +181,18 @@ jobs:
               < deploy/install-cert.sh
             ssh -p "$SERVER_PORT" -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
               "$SERVER_USER@$SERVER_HOST" "rm -rf '$STAGING_PATH/$domain'"
+            changed="$changed $domain"
             echo "::endgroup::"
           done
+          echo "changed=$(echo $changed)"
+          echo "changed=$(echo $changed)" >> "$GITHUB_OUTPUT"
 
       # 证书换好了，但 Nginx 配置里引用的路径要跟着更新（首次申请时还要从「只走 HTTP」
       # 切到「HTTP 301 + HTTPS」）。这一步复用初始化脚本，它的 nginx -t 校验和回滚同样生效。
       # 勾 refresh 也会走到这里：备案通过、解析切到本机之后，靠它把配置切到 HTTPS
       # （在那之前脚本自己会判断域名还没指过来，继续用 HTTP + IP 直连，不会把入口弄没）。
       - name: Refresh the Nginx configuration
-        if: steps.plan.outputs.renewed != '' || inputs.refresh == true
+        if: steps.install.outputs.changed != '' || inputs.refresh == true
         run: |
           ssh -p "$SERVER_PORT" -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
             "$SERVER_USER@$SERVER_HOST" 'bash -s' -- --cert-source tencent --owner "$SERVER_USER" \
@@ -180,11 +202,11 @@ jobs:
       # 443 上当然是别人的证书，这不是失败。真正的保证在服务器那一侧——
       # install-cert.sh 校验过域名与私钥、跑过 nginx -t，失败会回滚并让 job 变红。
       - name: Compare the served certificate (informational)
-        if: steps.plan.outputs.renewed != '' || inputs.refresh == true
+        if: steps.plan.outputs.prepared != '' || inputs.refresh == true
         run: |
           set -uo pipefail
           # 换过证书的域名才比指纹；只勾 refresh 时本地没有新证书，就只报告线上发的是什么。
-          compare="${{ steps.plan.outputs.renewed }}"
+          compare="${{ steps.plan.outputs.prepared }}"
           if [ -z "$compare" ]; then compare="${{ steps.plan.outputs.domains }}"; fi
           for domain in $compare; do
             served=$(echo | openssl s_client -connect "$domain:443" -servername "$domain" 2>/dev/null \

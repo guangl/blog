@@ -9,11 +9,14 @@
  * 拿到证书后解出 fullchain.pem + privkey.pem，交给 deploy/install-cert.sh 装。
  *
  * 流程（每个域名一遍）：
- *   1. DescribeCertificates 找该域名现有的已签发证书，算剩余天数；
- *      剩余天数够（默认 > 21 天）就直接跳过，不打任何写接口——定时任务可以天天跑。
- *   2. ApplyCertificate 申请免费证书（PackageType 83，有效期 3 个月）。
- *      证书快到期时带上 OldCertificateId，腾讯云会记一条续费关系。
- *   3. DescribeCertificateDetail 取 DV 验证信息（DvAuthKey / DvAuthValue）。
+ *   1. DescribeCertificates 找该域名现有的已签发证书，算剩余天数。
+ *   2. 剩余天数够（默认 > 21 天）就**不申请新的**，只是调用 DownloadCertificate 把
+ *      账号里这一份取回来；不够才 ApplyCertificate 申请一张新的。
+ *      也就是说「要不要花配额」由剩余天数决定，而「服务器上该装哪一份」由取回来的
+ *      文件决定——腾讯云控制台里手动签发的证书，跑一次这个脚本也能装到服务器上。
+ *      申请新证书时会带上 OldCertificateId，腾讯云会记一条续费关系。
+ *   3. DescribeCertificateDetail 取 DV 验证信息（DvAuthKey / DvAuthValue）——只有申请
+ *      新证书时才需要这一步。
  *   4. 把 TXT 记录写进 Cloudflare（--zone，默认取域名后两段），
  *      再用 DNS-over-HTTPS 确认这条记录真的能查到，然后等它签发。
  *   5. DownloadCertificate 拿回一个 base64 的 ZIP，解出证书链和私钥，
@@ -201,7 +204,13 @@ async function findIssuedCertificate(domain) {
   const matches = (response.Certificates || [])
     .filter(c => c.CertificateType === 'SVR' && c.Status === 1)
     .filter(c => c.Domain === domain || (c.SubjectAltName || []).includes(domain))
-    .sort((a, b) => Date.parse((b.CertEndTime || '').replace(' ', 'T')) - Date.parse((a.CertEndTime || '').replace(' ', 'T')));
+    // 主域名精确匹配的排前面，其次是「证书里带这个域名」的（比如一张多域名证书），
+    // 同类里取到期最晚的。SearchKey 是模糊匹配，不排一下可能挑到边上的那张。
+    .sort((a, b) => {
+      const exact = (a.Domain === domain ? 0 : 1) - (b.Domain === domain ? 0 : 1);
+      if (exact !== 0) return exact;
+      return Date.parse((b.CertEndTime || '').replace(' ', 'T')) - Date.parse((a.CertEndTime || '').replace(' ', 'T'));
+    });
   return matches[0] || null;
 }
 
@@ -391,14 +400,62 @@ async function downloadInto(outDirForDomain, certificateId) {
 // ---------------------------------------------------------------------------
 const results = [];
 
+/** 申请一张新证书（走 DNS 验证），证书 ID 记进 record；顺带把加的 TXT 记录记进 state 以便收尾删除。 */
+async function renewCertificate({ zone, domain, existing, left, record, state }) {
+  // 快到期时把旧证书带进申请，让腾讯云记一条续费关系（SDK：有效期 30 天内且未过期才允许）。
+  const applyArgs = {
+    DomainName: domain,
+    DvAuthMethod: 'DNS',
+    PackageType: '83',              // TrustAsia C1 DV Free
+    ValidityPeriod: '3',
+    Alias: domain
+  };
+  if (existing && left > 0 && left <= 30) applyArgs.OldCertificateId = existing.CertificateId;
+
+  const applied = await client.ApplyCertificate(applyArgs);
+  const certificateId = applied.CertificateId;
+  record.certificateId = certificateId;
+  log(`  已申请：${certificateId}`);
+
+  const dv = await waitForDvAuth(certificateId);
+  if (dv.issued) return;            // 极少数情况下申请完就已经签好了
+
+  log(`  验证记录：${dv.authKey} = ${dv.authValue}`);
+  state.zoneId = await cfZoneId(zone);
+  await cfDropStaleTxt(state.zoneId, dv.authKey);
+  state.txtRecordId = await cfAddTxt(state.zoneId, dv.authKey, dv.authValue);
+  log(`  已写入 Cloudflare TXT（记录 ${state.txtRecordId}）`);
+
+  // Cloudflare 是权威服务器，记录写进去就该立刻能查到；查不到通常是 Token
+  // 写到了别的区域、或者域名其实不在这个账号下——先把这个坑排掉再等签发。
+  let visible = false;
+  for (let attempt = 1; attempt <= 10 && !visible; attempt += 1) {
+    visible = await txtIsVisible(dv.authKey, dv.authValue);
+    if (!visible) await sleep(6);
+  }
+  log(visible ? '  DNS 记录已能从公共解析查到' : '  [!] DNS 记录在公共解析里还看不到，仍继续等腾讯云自己重试');
+
+  // 给腾讯云一个主动检查的机会：它返回的 LocalCheck 能直接告诉你记录看到没有。
+  try {
+    const checked = await client.CheckCertificateDomainVerification({ CertificateId: certificateId });
+    for (const item of checked.VerificationResults || []) {
+      const code = item.LocalCheck === 1 ? '通过' : `未通过（LocalCheck=${item.LocalCheck}${item.LocalCheckFailReason ? `，${item.LocalCheckFailReason}` : ''}）`;
+      log(`  · 腾讯云自检 ${item.Domain}：${code}`);
+    }
+  } catch (error) {
+    warn(`  · 腾讯云自检接口没成功（不致命）：${error.message}`);
+  }
+  await waitForIssued(certificateId);
+  log('  已签发');
+}
+
 async function main() {
   for (const domain of domainList) {
     const zone = zoneFor(domain);
     log(`\n=== ${domain}（Cloudflare 区域 ${zone}）===`);
 
     const record = { domain, action: 'renewed', certificateId: null, previousCertificateId: null };
-    let zoneId = null;
-    let txtRecordId = null;
+    const state = { zoneId: null, txtRecordId: null };
 
     try {
       const existing = await findIssuedCertificate(domain);
@@ -413,63 +470,30 @@ async function main() {
         results.push({ domain, action: 'check', certificateId: existing?.CertificateId || null, daysLeft: Number(left.toFixed(1)) });
         continue;
       }
-      if (!force && existing && left > threshold) {
-        log(`  剩余天数高于 ${threshold} 天，跳过`);
-        results.push({ domain, action: 'skipped', reason: `还剩 ${left.toFixed(1)} 天`, certificateId: existing.CertificateId, daysLeft: Number(left.toFixed(1)) });
-        continue;
-      }
       if (dryRun) {
-        log(`  将申请一张新的免费证书（${existing ? `旧证书还剩 ${left.toFixed(1)} 天` : '首次申请'}）`);
+        const verdict = existing && !force && left > threshold
+          ? `现有证书还剩 ${left.toFixed(1)} 天，只会取现有的那一份`
+          : '会申请一张新的免费证书';
+        log(`  试运行：${verdict}`);
         results.push({ domain, action: 'plan', certificateId: existing?.CertificateId || null, daysLeft: existing ? Number(left.toFixed(1)) : null });
         continue;
       }
 
       record.previousCertificateId = existing?.CertificateId || null;
 
-      // 快到期时把旧证书带进申请，让腾讯云记一条续费关系（SDK：有效期 30 天内且未过期才允许）。
-      const applyArgs = {
-        DomainName: domain,
-        DvAuthMethod: 'DNS',
-        PackageType: '83',              // TrustAsia C1 DV Free
-        ValidityPeriod: '3',
-        Alias: domain
-      };
-      if (existing && left > 0 && left <= 30) applyArgs.OldCertificateId = existing.CertificateId;
-
-      const applied = await client.ApplyCertificate(applyArgs);
-      const certificateId = applied.CertificateId;
-      record.certificateId = certificateId;
-      log(`  已申请：${certificateId}`);
-
-      const dv = await waitForDvAuth(certificateId);
-      if (!dv.issued) {
-        log(`  验证记录：${dv.authKey} = ${dv.authValue}`);
-        zoneId = await cfZoneId(zone);
-        await cfDropStaleTxt(zoneId, dv.authKey);
-        txtRecordId = await cfAddTxt(zoneId, dv.authKey, dv.authValue);
-        log(`  已写入 Cloudflare TXT（记录 ${txtRecordId}）`);
-
-        // Cloudflare 是权威服务器，记录写进去就该立刻能查到；查不到通常是 Token
-        // 写到了别的区域、或者域名其实不在这个账号下——先把这个坑排掉再等签发。
-        let visible = false;
-        for (let attempt = 1; attempt <= 10 && !visible; attempt += 1) {
-          visible = await txtIsVisible(dv.authKey, dv.authValue);
-          if (!visible) await sleep(6);
-        }
-        log(visible ? '  DNS 记录已能从公共解析查到' : '  [!] DNS 记录在公共解析里还看不到，仍继续等腾讯云自己重试');
-
-        // 给腾讯云一个主动检查的机会：它返回的 LocalCheck 能直接告诉你记录看到没有。
-        try {
-          const checked = await client.CheckCertificateDomainVerification({ CertificateId: certificateId });
-          for (const item of checked.VerificationResults || []) {
-            const code = item.LocalCheck === 1 ? '通过' : `未通过（LocalCheck=${item.LocalCheck}${item.LocalCheckFailReason ? `，${item.LocalCheckFailReason}` : ''}）`;
-            log(`  · 腾讯云自检 ${item.Domain}：${code}`);
-          }
-        } catch (error) {
-          warn(`  · 腾讯云自检接口没成功（不致命）：${error.message}`);
-        }
-        await waitForIssued(certificateId);
-        log('  已签发');
+      // 要不要申请新的，和「服务器上有没有装」是两件事：
+      //   · 快到期（或 --force、或压根没有证书）→ 申请一张新的；
+      //   · 现有证书还早 → 不申请，把账号里这一份直接取回来。
+      // 两条路最后都走 downloadInto，所以「控制台里手动签好了、服务器上还没装」这种情况
+      // 跑一次就能装上，不必等到证书快过期。DownloadCertificate 是只读接口，不占配额。
+      let certificateId;
+      if (existing && !force && left > threshold) {
+        certificateId = existing.CertificateId;
+        record.action = 'reused';
+        log(`  剩余天数高于 ${threshold} 天（${left.toFixed(1)} 天），不申请新的，直接取现有这份`);
+      } else {
+        await renewCertificate({ zone, domain, existing, left, record, state });
+        certificateId = record.certificateId;
       }
 
       const written = await downloadInto(join(outDir, domain), certificateId);
@@ -485,7 +509,7 @@ async function main() {
       results.push(record);
     } finally {
       // 验证记录用完就删：留在 DNS 里没有意义，还会让下次申请多一条同名的 TXT。
-      if (zoneId && txtRecordId) await cfDeleteTxt(zoneId, txtRecordId);
+      if (state.zoneId && state.txtRecordId) await cfDeleteTxt(state.zoneId, state.txtRecordId);
     }
   }
 }
@@ -501,9 +525,12 @@ try {
 // 汇报
 // ---------------------------------------------------------------------------
 const failed = results.filter(r => r.action === 'failed');
+// prepared = 本地已经拿到证书的域名（新申请的或直接取现有的），也就是「服务器上应该装这些」。
+const prepared = results.filter(r => r.action === 'renewed' || r.action === 'reused');
 if (json) {
   console.log(JSON.stringify({
     domains: results,
+    prepared: prepared.map(r => r.domain),
     renewed: results.filter(r => r.action === 'renewed').map(r => r.domain),
     failed: failed.map(r => r.domain),
     error: fatal ? fatal.message : null,
@@ -513,7 +540,8 @@ if (json) {
 } else {
   log('\n———————————————————————————');
   for (const r of results) {
-    if (r.action === 'renewed') log(`${r.domain}：已换新证书（${r.certificateId}）`);
+    if (r.action === 'renewed') log(`${r.domain}：已申请并取回新证书（${r.certificateId}）`);
+    else if (r.action === 'reused') log(`${r.domain}：取回现有证书 ${r.certificateId}（未申请新的）`);
     else if (r.action === 'failed') log(`${r.domain}：失败——${r.error}`);
     else if (r.action === 'skipped') log(`${r.domain}：${r.reason}，跳过`);
     else if (r.action === 'check') log(`${r.domain}：还剩 ${r.daysLeft} 天`);
