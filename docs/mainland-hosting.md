@@ -23,13 +23,13 @@
 
 ## 步骤 1：初始化服务器
 
-在本地执行，脚本经 stdin 送到服务器：
+在本地执行，脚本经 stdin 送到服务器。**阶段一不需要邮箱**，证书那一步会跳过：
 
 ```bash
-ssh root@<公网IP> 'bash -s' -- --email you@example.com < deploy/server-setup.sh
+ssh root@<公网IP> 'bash -s' -- --skip-cert < deploy/server-setup.sh
 ```
 
-脚本会装好 `nginx`、`certbot`、`rsync`，建出站点目录 `/var/www/blog.guangluo.top`（属主可用 `--owner` 指定），装上一份**只走 HTTP** 的 Nginx 配置，并摘掉 Debian 自带的默认站点。此时因为域名还没解析过来，它会跳过证书签发并提示下一步。
+脚本会装好 `nginx`、`certbot`、`rsync`，建出站点目录 `/var/www/blog.guangluo.top`（属主可用 `--owner` 指定），装上一份**只走 HTTP** 的 Nginx 配置，并摘掉 Debian 自带的默认站点。装完可以先用 `http://<公网IP>/` 确认 Nginx 在跑。
 
 `--help` 可以看到全部参数；`--aliases ""` 表示只给主域名签证书、不处理 `www` 和裸域。
 

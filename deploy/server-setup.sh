@@ -45,7 +45,26 @@ warn() { printf '\033[1;33m[!]\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
-  sed -n '3,28p' "$0" | sed 's/^#\s\?//'
+  # 通过 stdin 运行时（ssh root@… 'bash -s' < deploy/server-setup.sh）$0 是 bash，
+  # 不能拿它去读脚本自身的注释，所以这里固定输出用法。
+  if [ -r "$0" ] && head -1 "$0" 2>/dev/null | grep -q '^#!'; then
+    sed -n '3,28p' "$0" | sed 's/^#\s\?//'
+  else
+    cat <<'USAGE'
+用法（在本地执行，脚本经 stdin 送到服务器）：
+  ssh root@<公网IP> 'bash -s' -- --email you@example.com < deploy/server-setup.sh
+
+参数：
+  --email <地址>        必填，Let's Encrypt 到期通知邮箱（用 --skip-cert 时可不填）
+  --domain <域名>       主域名，默认 blog.guangluo.top
+  --aliases "<域名…>"   一起签发证书并 301 到主站的备用域名，
+                        默认 "www.guangluo.top guangluo.top"；传空字符串表示只要主域名
+  --owner <用户>        站点目录属主（GitHub Actions 里的 SERVER_USER），默认 root
+  --staging             用 Let's Encrypt 测试环境签发（调试用，浏览器不信任）
+  --skip-cert           只初始化，不尝试签发证书
+  -h | --help           显示帮助
+USAGE
+  fi
 }
 
 while [ $# -gt 0 ]; do
@@ -221,8 +240,14 @@ install_config() {
   local target
   target=$(mktemp)
 
-  { "$builder"; [ -n "$ALIASES" ] && [ "$builder" = write_https_config ] && write_https_alias_block; } \
-    | fill_placeholders > "$target"
+  # 这里必须用 if，不能写 `[ … ] && [ … ] && func`：后者在条件不成立时返回 1，
+  # 作为管道的最后一条命令会被 set -e 判成失败，脚本会静默退出。
+  {
+    "$builder"
+    if [ -n "$ALIASES" ] && [ "$builder" = write_https_config ]; then
+      write_https_alias_block
+    fi
+  } | fill_placeholders > "$target"
 
   if [ -f "$AVAILABLE" ]; then
     backup=$(mktemp)
@@ -255,25 +280,37 @@ install_config() {
 # 3. 域名是否已经指向本机
 # ---------------------------------------------------------------------------
 public_ip() {
-  curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null \
-    || ip -4 route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}' \
-    || true
+  # 腾讯云 CVM 的公网 IP 走 NAT，机器上只能看到内网地址（10.x），
+  # 所以优先问云厂商的元数据服务，再用外部回显兜底（必须强制 IPv4，
+  # 否则在有 IPv6 的机器上会拿到 IPv6 地址）。
+  local ip=''
+  ip=$(curl -fsS --max-time 3 http://metadata.tencentyun.com/latest/meta-data/public-ipv4 2>/dev/null || true)
+  [ -n "$ip" ] || ip=$(curl -fsS -4 --max-time 8 https://api.ipify.org 2>/dev/null || true)
+  [ -n "$ip" ] || ip=$(curl -fsS -4 --max-time 8 https://ifconfig.me/ip 2>/dev/null || true)
+  [ -n "$ip" ] || ip=$(curl -fsS -4 --max-time 8 https://ipinfo.io/ip 2>/dev/null || true)
+  printf '%s' "$ip" | tr -d '[:space:]'
 }
 
 SERVER_IP=$(public_ip)
+case "$SERVER_IP" in
+  10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*)
+    warn "只探测到内网地址（$SERVER_IP），不能拿它判断解析是否生效"
+    SERVER_IP=''
+    ;;
+esac
 resolves_here() {
   local host="$1"
   [ -n "$SERVER_IP" ] || return 1
   getent ahostsv4 "$host" 2>/dev/null | awk '{print $1}' | sort -u | grep -qx "$SERVER_IP"
 }
 
-DNS_READY=1
+# 这一节只是预检提示，用来告诉你「解析大概走到哪一步了」；
+# 真正决定要不要签证书的是下面 4.5 的 ACME 探测。
 for host in $SERVER_NAMES; do
   if resolves_here "$host"; then
     log "$host 已解析到本机（$SERVER_IP）"
-  else
-    DNS_READY=0
-    warn "$host 还没有解析到本机（本机公网 IP：${SERVER_IP:-未知}）"
+  elif [ -n "$SERVER_IP" ]; then
+    warn "$host 还没有解析到本机（本机公网 IP：$SERVER_IP）"
   fi
 done
 
@@ -287,15 +324,38 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 4.5 域名是否真的指向本机：直接探一次 ACME 路径
+#
+# 比「解析出来的 IP 等于本机公网 IP」可靠得多：把探测文件写进 ACME 目录，
+# 再从公网按域名取回来，内容一致就说明解析、80 端口和 nginx 的 ACME 路径全都通了。
+# 云厂商的 NAT 公网 IP、IPv6、CDN 代理这些情况也一并覆盖。
+# ---------------------------------------------------------------------------
+ACME_READY=1
+if [ "$SKIP_CERT" -eq 0 ] && [ ! -f "$CERT_DIR/fullchain.pem" ]; then
+  for host in $SERVER_NAMES; do
+    token="probe-$$-$RANDOM"
+    printf '%s' "$token" > "$ACME_ROOT/.well-known/acme-challenge/$token"
+    got=$(curl -fsS --max-time 10 "http://$host/.well-known/acme-challenge/$token" 2>/dev/null || true)
+    rm -f "$ACME_ROOT/.well-known/acme-challenge/$token"
+    if [ "$got" = "$token" ]; then
+      log "$host 的 ACME 探测通过（解析、80 端口、nginx 都就绪）"
+    else
+      ACME_READY=0
+      warn "$host 的 ACME 探测没通过"
+    fi
+  done
+fi
+
+# ---------------------------------------------------------------------------
 # 5. 签发证书
 # ---------------------------------------------------------------------------
 if [ "$SKIP_CERT" -eq 1 ]; then
   warn '按 --skip-cert 跳过证书签发'
 elif [ -f "$CERT_DIR/fullchain.pem" ]; then
   log "已存在证书（$CERT_DIR），跳过签发；续期由 certbot.timer 负责"
-elif [ "$DNS_READY" -ne 1 ]; then
-  warn '域名还没全部解析到本机，先不签发证书。'
-  warn "备案通过后把 $SERVER_NAMES 的 A 记录指向 $SERVER_IP（Cloudflare 要关掉橙云代理），再跑一次本脚本即可。"
+elif [ "$ACME_READY" -ne 1 ]; then
+  warn '域名还没指向本机，先不签发证书（也可能是 80 端口没放行，或还挂着 CDN 代理）。'
+  warn "备案通过后把 $SERVER_NAMES 的 A 记录指向本机公网 IP${SERVER_IP:+（$SERVER_IP）}，Cloudflare 关掉橙云代理，再跑一次本脚本即可。"
 else
   log '开始签发证书（Let'"'"'s Encrypt）'
   certbot_args=(certonly --webroot -w "$ACME_ROOT" -n --agree-tos --no-eff-email
@@ -327,16 +387,17 @@ cat <<EOF
   站点属主     $OWNER（GitHub Actions 里的 SERVER_USER 要与它一致）
   Nginx 配置   $AVAILABLE
   证书目录     $CERT_DIR
+  本机公网 IP  ${SERVER_IP:-未能自动识别，以腾讯云控制台显示的为准}
 
 接下来：
-  1. 腾讯云控制台 → 安全组 → 放行 22 / 80 / 443（80 与 443 现在只对大陆备案要求敏感）
-  2. 备案通过后，把 $SERVER_NAMES 的 A 记录指向 $SERVER_IP，
+  1. 腾讯云控制台 → 安全组 → 放行 22 / 80 / 443
+  2. 备案通过后，把 $SERVER_NAMES 的 A 记录指向本机公网 IP，
      Cloudflare 上必须改成 DNS only（灰云），代理开着会让备案核查看到 Cloudflare 的 IP
   3. 再跑一次本脚本签发证书：
-     ssh root@$SERVER_IP 'bash -s' -- --email $EMAIL < deploy/server-setup.sh
+     ssh root@<公网IP> 'bash -s' -- --email ${EMAIL:-<你的邮箱>} < deploy/server-setup.sh
   4. 在 GitHub 仓库打开自动发布：
      Variables: SERVER_DEPLOY=true（可选 SERVER_DEPLOY_PATH）
-     Secrets:   SERVER_HOST=$SERVER_IP、SERVER_USER=$OWNER、SERVER_SSH_KEY=<私钥>
+     Secrets:   SERVER_HOST=<公网IP>、SERVER_USER=$OWNER、SERVER_SSH_KEY=<私钥>
 
 证书续期由 systemctl 的 certbot.timer 负责，可用下面这条确认：
   systemctl list-timers certbot.timer
