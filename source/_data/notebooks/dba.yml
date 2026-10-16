@@ -1,0 +1,14 @@
+name: DBA 手记
+tagline: 数据库日常运维里反复用到的检查与操作
+route:
+  path: /notebooks/dba/
+listing:
+  order: 1
+  per_page: 10
+  # 持续补充的知识记录，按更新时间倒序，最近改动的排在最前。
+  sort:
+    field: updated
+    direction: desc
+visibility:
+  listed: true
+  searchable: true
