@@ -6,11 +6,12 @@
 
 - `guangluo.top` 的权威 DNS 已是 Cloudflare：`elias.ns.cloudflare.com`、`etta.ns.cloudflare.com`。
 - 2026-10-16 已创建 Pages 项目 `guangluo-blog`，生产部署状态为 `success`，上传 84 个静态文件。
-- Pages 地址：`https://guangluo-blog.pages.dev/`；本次部署地址：`https://acf5651a.guangluo-blog.pages.dev/`。
-- 已在 Pages 添加 `blog.guangluo.top`。用户添加 DNS 记录后，验证状态 `verification_data.status` 已为 `active`；域名整体状态和证书验证仍为 `pending`，HTTPS 尚待验证。
+- Pages 地址：`https://guangluo-blog.pages.dev/`；自定义域名：`https://blog.guangluo.top/`。
+- 2026-10-16 Cloudflare API 已确认 `blog.guangluo.top` 的域名状态、DNS 验证和证书验证均为 `active`。
+- 已配置 GitHub 仓库 Secret 并启用自动发布，[首次 GitHub Actions 发布](https://github.com/guangl/blog/actions/runs/38893301306)已成功，构建和站点检查均通过。
 - 域名暂未备案，使用 Cloudflare 的全球网络；大陆直连效果需要上线后实测。
 - 当前授权可部署 Pages、绑定域名和读取区域信息，不含 DNS 修改权限。DNS 记录由域名所有者在控制台添加。
-- Pages API 已确认部署成功；本机访问 Pages 地址出现 403 或 TLS 连接错误，页面可用性仍需在自定义域名激活后验证。
+- Pages API 和 GitHub Actions 均确认部署成功。本机 HTTPS 请求仍遇到 TLS 连接错误，客户端访问情况需在实际使用网络中验证。
 
 ## 本地构建与验证
 
