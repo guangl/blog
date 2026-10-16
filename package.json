@@ -16,6 +16,8 @@
     "build:domain": "hexo generate --config _config.yml,_config.domain.yml",
     "verify:domain": "hexo stellar doctor --config _config.yml,_config.domain.yml && hexo clean --config _config.yml,_config.domain.yml && hexo generate --config _config.yml,_config.domain.yml && node tools/check-site.mjs _config.domain.yml",
     "server:domain": "hexo server --config _config.yml,_config.domain.yml --port 4001",
+    "seo:ping": "node tools/ping-search.mjs _config.domain.yml",
+    "seo:ping:dry": "node tools/ping-search.mjs _config.domain.yml --dry-run",
     "deploy:domain": "bun run verify:domain && bunx wrangler@4.151.0 pages deploy public-domain --project-name guangluo-blog --branch main --commit-dirty=true"
   },
   "hexo": {

@@ -51,3 +51,10 @@ jobs:
             --branch main \
             --commit-hash "$GITHUB_SHA" \
             --commit-dirty=false
+
+      # 目前只推送 IndexNow（Bing / Yandex 等）。百度搜索资源平台等域名备案后再接，
+      # 到时把 BAIDU_PUSH_TOKEN 作为 Secret 传入即可。
+      # 推送失败不影响已经上线的站点：默认非严格模式只告警，
+      # 需要发布即失败时给脚本加 --strict（package.json 的 seo:ping）。
+      - name: Notify search engines
+        run: bun run seo:ping

@@ -80,8 +80,41 @@ Direct Upload 项目后续可使用 Wrangler 和 GitHub Actions 自动部署。C
 - 确认 DNS 已解析到分配的目标，`https://blog.guangluo.top/` 证书有效。
 - 检查首页、文章、图片、搜索、订阅源、站点地图和 404 状态。
 - 在大陆宽带及移动网络中对比测试，记录首屏、文章图片与失败请求；境外区不保证解决所有跨境连接问题。
-- 将 `https://blog.guangluo.top/sitemap.xml` 提交到搜索引擎站长平台。
+- 将 `https://blog.guangluo.top/sitemap.xml` 提交到搜索引擎站长平台，步骤见下节。
 - 只维护 `blog.guangluo.top`，旧 GitHub Pages 地址停止更新。
+
+## 搜索引擎收录
+
+2026-10-17 实测：站点首次发布（2026-10-16）次日，Google 与百度都还没收录。搜狗、360、Bing、Brave 的 `site:` 查询均为 0 条，站长之家和爱站也查不到数据。抓取侧是正常的：`robots.txt` 放行全部主流爬虫，`sitemap.xml` 有 23 条 URL，用 Googlebot 和 Baiduspider 的 UA 请求首页与文章页都返回 200。缺的是主动提交，以及指向本站的外链。
+
+仓库已把提交做成配置项，只有填了值才会产生输出：
+
+| 配置 | 位置 | 说明 |
+| --- | --- | --- |
+| 验证令牌 | `_config.yml` 的 `seo.verification` | `google` / `bing`，输出为对应平台的验证 meta |
+| IndexNow 密钥 | `seo.indexnow_key` | 构建时生成站点根目录的 `<key>.txt`，Bing / Yandex / Seznam / Naver 靠它免登录核验 |
+
+- `scripts/seo-indexing.js`：输出验证 meta、生成 IndexNow 密钥文件。
+- `tools/ping-search.mjs`：把 `sitemap.xml` 里的 URL 推送给 IndexNow；没有配置密钥时跳过，默认非严格模式（推送失败只告警，不影响已经上线的站点）。
+- `tools/check-site.mjs`：配置了令牌或密钥就必须在产物里生效，否则 `bun run verify:domain` 失败。
+- `.github/workflows/deploy-cloudflare.yml`：Pages 发布成功后执行 `bun run seo:ping`。
+
+需要手动做一次的事情：
+
+1. **Google Search Console**（<https://search.google.com/search-console>）：添加 `blog.guangluo.top`。Cloudflare Pages 上放验证文件不方便，建议用 DNS TXT 的「域名」属性，或把 Search Console 给出的 meta 内容填进 `seo.verification.google`。然后提交 `https://blog.guangluo.top/sitemap.xml`，并对首页「请求编入索引」。Google 已在 2023 年停止 sitemap ping 接口，只能走控制台。
+2. **Bing Webmaster Tools**（<https://www.bing.com/webmasters>）：可从 Search Console 直接导入；IndexNow 已经能推送，导入后还能看抓取报告。
+
+百度搜索资源平台（<https://ziyuan.baidu.com>）**等域名备案后再接**：未备案时提交收录基本没有效果。届时需要补三处——`seo.verification.baidu` 的 `baidu-site-verification` 验证 meta、`tools/check-site.mjs` 里的 meta 映射、以及 `tools/ping-search.mjs` 里的「普通收录」推送（`POST https://data.zz.baidu.com/urls?site=&token=`，token 放 GitHub Secret）。`robots.txt` 里的 Baiduspider 分组已经保留。
+
+本地命令：
+
+```bash
+bun run verify:domain      # 构建 + 检查，包含验证 meta 与 IndexNow 密钥文件
+bun run seo:ping:dry       # 只打印将要推送的 URL，不发请求
+bun run seo:ping           # 真正推送 IndexNow
+```
+
+外链才是收录速度的关键：掘金、达梦社区、GitHub 个人主页等指向本站的链接，比任何提交动作都更能让 Google 主动发现站点。
 
 ## 本地测试链路
 

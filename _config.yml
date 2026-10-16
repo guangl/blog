@@ -116,6 +116,24 @@ sitemap:
   tags: true
   categories: true
 
+# 搜索引擎收录
+## 站长平台验证与推送。留空的项不会输出对应 meta，也不会发起推送。
+## 验证令牌最终出现在页面 HTML 里，属于公开信息，可以提交进仓库。
+## 百度搜索资源平台等域名备案后再接：到时应补 baidu-site-verification
+## 验证 meta 和「普通收录」推送，方式与这里的 google / bing 一致。
+seo:
+  # 各站长平台的站点验证令牌，键名对应输出的 meta：
+  #   google → google-site-verification（Google Search Console）
+  #   bing   → msvalidate.01（Bing Webmaster Tools）
+  # 以平台实际给出的验证代码为准，逐条填入 content 的值。
+  verification:
+    google: ""
+    bing: ""
+  # IndexNow 密钥：构建时生成站点根目录的 <key>.txt，
+  # 部署后由 tools/ping-search.mjs 推送给 Bing、Yandex、Seznam、Naver，无需登录站长平台。
+  # 密钥本身是公开的（就放在站点上），但改动后要重新推送一次。
+  indexnow_key: "5f133956eed7b3d11ff69fd52706426f"
+
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment
 deploy:

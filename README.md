@@ -2,6 +2,8 @@
 
 基于 [Hexo](https://hexo.io/) 和 [Stellar](https://github.com/xaoxuu/hexo-theme-stellar) 的个人博客，使用中文记录一名 DBA 的数据库管理、运维经验与摄影随记。
 
+线上地址：<https://blog.guangluo.top/>
+
 ## 本地运行
 
 ### 环境要求
@@ -42,6 +44,7 @@ bun run clean
 - Stellar 原生浅色 / 深色 / 跟随系统三种外观。
 - 全文 Atom 订阅：<https://blog.guangluo.top/atom.xml>。
 - 站点地图、robots.txt、规范链接、主题自带的 Open Graph 与结构化数据。
+- 搜索引擎收录支持：站长平台验证 meta、IndexNow 密钥文件、发布后自动推送（见 [SEO 与分享](#seo-与分享)）。
 - 本地图标与 404 插图；照片提供封面、正文预览图和原图入口。
 - 文章和页脚使用与仓库一致的 CC BY 4.0 协议。
 
@@ -188,9 +191,27 @@ bunx hexo stellar new note --notebook dba --title "标题" --tags "postgresql/�
 
 另外，主题默认的 `fallbacks.cover` / `link_card` 指向**主题作者 CDN 的占位图**（`gcore.jsdelivr.net/gh/cdn-x/placeholder`）。本站已把 `cover` 换成自己的图；`link_card` 未配置，因为站点目前没有用到链接卡片类标签。自检会检查页面里不再出现该 CDN。
 
+### 搜索引擎收录
+
+2026-10-17 实测：站点首次发布次日，Google 与百度都还没收录；搜狗、360、Bing、Brave 和站长工具查询同样是 0 条。抓取侧没有问题（`robots.txt` 放行、`sitemap.xml` 有全部页面、Googlebot 和 Baiduspider 的 UA 都拿到 200），缺的是**主动提交**。仓库已经把提交做成配置项：
+
+| 配置 | 位置 | 说明 |
+| --- | --- | --- |
+| 站长平台验证令牌 | `_config.yml` 的 `seo.verification` | `google` / `bing`，填了才输出对应 meta |
+| IndexNow 密钥 | `seo.indexnow_key` | 构建时生成站点根目录的 `<key>.txt`，Bing / Yandex / Seznam / Naver 免登录核验 |
+
+百度搜索资源平台暂不接入：域名未备案，提交收录意义不大。备案后再补 `baidu-site-verification` 验证 meta、「普通收录」推送和 `robots.txt` 里的 Baiduspider 分组（分组已保留，因为百度仍可能自己抓取）。
+
+```bash
+bun run seo:ping:dry   # 只打印将要推送的 URL
+bun run seo:ping       # 推送 IndexNow
+```
+
+`scripts/seo-indexing.js` 负责验证 meta 与密钥文件，`tools/ping-search.mjs` 负责发布后推送，`tools/check-site.mjs` 会检查「配置了就必须生效」。`.github/workflows/deploy-cloudflare.yml` 在 Pages 发布成功后自动执行推送，第三方接口失败只告警，不会把成功的发布判成失败。完整步骤见 [域名部署说明](docs/domain-deployment.md#搜索引擎收录)。
+
 ## 脚本与注入
 
-`scripts/` 下两个构建期插件（公式、图表）都只在生成静态文件时运行，不会发给访客。唯一的样式注入是 `_config.stellar.yml` 里的 `inject.head_end`：它给首页 Hero 的**图片**背景补一层轻遮罩。主题只为「视频 / 动效」英雄加遮罩，图片英雄不加，而汉口江滩这张照片的天空很亮，白色标题在浅色和深色下的对比度都只有 2.2:1；补遮罩后标题为 3.4:1、简介为 5.1:1，达到 WCAG AA。选择器沿用主题原始的 `.cover-content.wiki-hero .wiki-cover-background.image .wiki-cover-background-overlay` 以覆盖默认值，作用范围只限首页图片英雄。
+`scripts/` 下两个构建期插件（公式、图表）都只在生成静态文件时运行，不会发给访客。`scripts/seo-fixes.js` 修正结构化数据与社交卡片，`scripts/seo-indexing.js` 只输出站长平台验证 meta 和 IndexNow 密钥文件；两者都不改变抓取结果以外的行为。唯一的样式注入是 `_config.stellar.yml` 里的 `inject.head_end`：它给首页 Hero 的**图片**背景补一层轻遮罩。主题只为「视频 / 动效」英雄加遮罩，图片英雄不加，而汉口江滩这张照片的天空很亮，白色标题在浅色和深色下的对比度都只有 2.2:1；补遮罩后标题为 3.4:1、简介为 5.1:1，达到 WCAG AA。选择器沿用主题原始的 `.cover-content.wiki-hero .wiki-cover-background.image .wiki-cover-background-overlay` 以覆盖默认值，作用范围只限首页图片英雄。
 
 `tools/check-site.mjs` 仅在构建时检查生成结果，不会发给访客。主题自身仍会加载其 CSS 和 JavaScript。当前沿用主题默认 viewport 设置，包括 `maximum-scale=1`，没有额外改写主题输出。
 

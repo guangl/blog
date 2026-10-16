@@ -142,7 +142,33 @@ feed('entry').each((_, element) => {
 
 const sitemap = load(readFileSync(resolve(output, 'sitemap.xml'), 'utf8'), { xmlMode: true });
 sitemap('loc').each((_, element) => localTarget(sitemap(element).text(), site, 'sitemap.xml'));
+const sitemapUrls = sitemap('loc').toArray().map(element => sitemap(element).text().trim());
+report(sitemapUrls.length > 0, 'sitemap.xml has no URLs');
+report(sitemapUrls.includes(site.href), 'sitemap.xml is missing the homepage');
 report(readFileSync(resolve(output, 'robots.txt'), 'utf8').includes(new URL('sitemap.xml', site).href), 'robots.txt has wrong sitemap URL');
+
+// 搜索引擎收录：站内只做“配置了就必须生效”的检查，没填的键不产生任何输出。
+// 百度搜索资源平台的那条验证等域名备案后再加进 seoMeta。
+const seo = config.seo || {};
+const seoMeta = {
+  google: 'google-site-verification',
+  bing: 'msvalidate.01'
+};
+const homepage = load(readFileSync(resolve(output, 'index.html'), 'utf8'));
+for (const [key, name] of Object.entries(seoMeta)) {
+  const token = ((seo.verification || {})[key] || '').trim();
+  if (!token) continue;
+  report(homepage(`meta[name="${name}"]`).attr('content') === token, `Homepage is missing the ${name} verification meta`);
+}
+const indexnowKey = (seo.indexnow_key || '').trim();
+if (indexnowKey) {
+  const keyFile = resolve(output, `${indexnowKey}.txt`);
+  report(indexnowKey.length >= 8, 'IndexNow key must be at least 8 characters');
+  report(existsSync(keyFile), `Missing IndexNow key file: ${indexnowKey}.txt`);
+  if (existsSync(keyFile)) {
+    report(readFileSync(keyFile, 'utf8').trim() === indexnowKey, 'IndexNow key file content does not match seo.indexnow_key');
+  }
+}
 
 if (errors.length) {
   console.error(errors.join('\n'));

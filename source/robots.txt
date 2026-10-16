@@ -1,4 +1,15 @@
+# 全部爬虫默认允许抓取。
 User-agent: *
+Allow: /
+
+# 关注的搜索引擎显式放行，便于站长平台核对抓取权限。
+User-agent: Googlebot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: Bingbot
 Allow: /
 
 Sitemap: https://blog.guangluo.top/sitemap.xml
