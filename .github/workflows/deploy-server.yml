@@ -1,0 +1,89 @@
+name: Deploy to mainland server
+
+# 把 public-domain/ 用 rsync 同步到腾讯云 ECS（Debian 13 + Nginx），
+# 作为 Cloudflare Pages 之外的大陆主站通道。初始化服务器见
+# deploy/server-setup.sh，完整步骤见 docs/mainland-hosting.md。
+#
+# 用仓库变量 SERVER_DEPLOY 当开关：变量不是 true 时整个任务跳过，
+# 所以在服务器和 Secret 准备好之前，这条通道不会让 CI 变红。
+#
+# Settings → Secrets and variables → Actions：
+#   Secrets   SERVER_HOST（公网 IP）、SERVER_USER（如 root）、SERVER_SSH_KEY（私钥）
+#             可选 SERVER_PORT（默认 22）
+#   Variables SERVER_DEPLOY = true；可选 SERVER_DEPLOY_PATH（默认 /var/www/blog.guangluo.top）
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mainland-server-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.SERVER_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: mainland-server
+      url: https://blog.guangluo.top
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
+      DEPLOY_PATH: ${{ vars.SERVER_DEPLOY_PATH || '/var/www/blog.guangluo.top' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.3'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build and check custom-domain site
+        run: bun run verify:domain
+
+      - name: Check deploy configuration
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          missing=0
+          for name in SERVER_HOST SERVER_USER SERVER_SSH_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::缺少仓库 Secret：$name（见 docs/mainland-hosting.md）"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Install SSH key
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # 固定服务器指纹，避免每次都是首次连接
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          test -s ~/.ssh/known_hosts || {
+            echo "::error::无法读取 $SERVER_HOST:$SERVER_PORT 的 SSH 主机公钥，确认安全组已放行 22 端口。"
+            exit 1
+          }
+
+      - name: Sync public-domain/ to the server
+        run: |
+          rsync --archive --compress --delete --human-readable --stats \
+            -e "ssh -p $SERVER_PORT -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes" \
+            public-domain/ "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/"
