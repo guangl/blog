@@ -123,14 +123,11 @@ search:
     cache_ttl_seconds: 3600
 
 canonical:
-  # 必须是裸主机名：主题会把它 base64 后与 location.hostname 比对，
-  # 判断当前访问的主机是否为主站。
+  # 主站主机名（裸主机名）：页面的 <link rel="canonical"> 由它生成。
   host: blog.guangluo.top
-  # 允许的备用主机。不在这个名单里的主机访问时会弹出「非法克隆站」提示。
-  # 主题的判定逻辑（source/js/main.js 的 canonicalCheck）：
-  #   1. 先把当前 hostname 的 `www.` 前缀剥掉，所以列裸域即可覆盖 www；
-  #   2. 与 canonical.host 相等、或在 allowed_hosts 里，就放行；
-  #   3. 命中 `localhost` 时直接跳过检查。
+  # 备用主机名单。注意：主题的「非法克隆站 / 官方备用站」浮层提示已经整体关掉，
+  # 见 scripts/canonical-notice.js，所以这里的名单目前只是记录用途，不影响页面行为。
+  # 想恢复提示就删掉那个脚本。
   allowed_hosts:
     - guangluo-blog.pages.dev
     - guangluo.top          # 裸域与 www 都归一到这里
