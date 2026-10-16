@@ -36,6 +36,8 @@
 
 体检脚本连不上本站时同样降级：证书那一项在 CI 断网、被墙、端口不通时只告警，不让一次网络抖动变成一条误导人的红。页面可用性会补一次重试，但重试后仍拿不到响应的算失败——本站打不开就是真的打不开。
 
+TLS 这一项对大陆通道还有一层兜底作用：备案后 `blog.guangluo.top` 解析到腾讯云 ECS，证书由 `.github/workflows/renew-server-cert.yml` 在剩余不到 21 天时自动换新（见 [大陆托管与备案](mainland-hosting.md#证书续期腾讯云免费-dv-证书)）。这里是**独立的一路检查**：那条工作流本身挂了，体检仍会在一周内把「证书快到期」报出来。
+
 ## 本地怎么跑
 
 ```bash
@@ -54,7 +56,7 @@ node tools/audit-live.mjs --help
 
 默认输出是四段人类可读清单加末尾汇总（通过 / 告警 / 失败各多少条），带 `✗` 的行就是失败项。
 
-注意：安全头与证书这两项是针对 **Cloudflare Pages 通道**写的。`deploy/server-setup.sh` 的 Nginx 通道**故意没开 HSTS**、也没有 `_headers` 文件，用 `--base` 直接指向 ECS 地址时，HSTS 那一项会按预期报失败——这不是 bug，是两条通道本来就不一样。
+注意：安全头与证书这两项是针对 **Cloudflare Pages 通道**写的。`deploy/server-setup.sh` 的 Nginx 通道**故意没开 HSTS**、也没有 `_headers` 文件，用 `--base` 直接指向 ECS 地址时，HSTS 那一项会按预期报失败——这不是 bug，是两条通道本来就不一样。证书那一项两条通道都适用（都只看剩余有效期），所以大陆通道切过去之后不用改这里。
 
 ## CI：.github/workflows/site-audit.yml
 

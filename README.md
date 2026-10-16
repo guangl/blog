@@ -215,6 +215,8 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 
 仓库还有第二条发布通道：`.github/workflows/deploy-server.yml` 用 rsync 把 `public-domain/` 同步到腾讯云 ECS（大陆主站，Nginx 直接托管静态文件）。它默认关闭，用仓库变量 `SERVER_DEPLOY=true` 打开；服务器初始化、备案与切解析顺序见 [大陆托管与备案](docs/mainland-hosting.md)。备案号填 `_config.yml` 的 `beian` 段，留空时页脚不输出任何内容。
 
+还有第三条工作流专管大陆通道的证书：`.github/workflows/renew-server-cert.yml`（仓库变量 `SERVER_CERT_RENEW=true` 开关）每周查一次腾讯云免费 DV 证书的剩余天数，快到期就重新申请、用 Cloudflare 加 DNS 验证记录、下载后原子换进服务器并重写 Nginx 配置。腾讯云的自动部署管不到自建 Nginx，而免费证书只有 3 个月，所以这段必须自己来；逻辑在 `tools/ssl-renew.mjs`，装证书在 `deploy/install-cert.sh`，也可以不带 Certbot 地用它替换 Let's Encrypt，见 [大陆托管与备案](docs/mainland-hosting.md#证书续期腾讯云免费-dv-证书)。
+
 ### 线上定时体检
 
 `verify` 只证明「产物里该有的都有」，看不到线上真实的一面：响应头到底发出去没有、证书还剩几天、页面里的外链有没有烂掉。这三件事由 `.github/workflows/site-audit.yml` 每周一 09:00（北京时间，cron 写 UTC 的 `0 1 * * 1`）打一次线上站点：
@@ -254,6 +256,9 @@ node tools/audit-live.mjs --base http://127.0.0.1:4001/   # 换目标（比如�
 | 产物自检的硬约束 | `tools/check-site.mjs` |
 | 对比度 / 裂图 / CSP 实测 | `tools/browser-check.mjs` |
 | 线上体检的检查项与判定规则 | `tools/audit-live.mjs`、`docs/site-audit.md` |
+| 大陆服务器的初始化与 Nginx 配置 | `deploy/server-setup.sh`、`docs/mainland-hosting.md` |
+| 大陆证书的申请与续期 | `tools/ssl-renew.mjs`、`.github/workflows/renew-server-cert.yml` |
+| 证书落地（原子替换 + 回滚） | `deploy/install-cert.sh` |
 | 依赖更新的节奏与生态 | `.github/dependabot.yml` |
 
 ## 关于专栏与笔记本

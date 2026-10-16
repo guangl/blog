@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# 腾讯云 ECS（Debian 13）初始化：Nginx + certbot + 站点目录
+# 腾讯云 ECS（Debian 13）初始化：Nginx + 站点目录 + 证书
 #
 # 用法（在本地执行，把脚本经 stdin 送到服务器）：
 #   ssh root@<公网IP> 'bash -s' -- --email you@example.com < deploy/server-setup.sh
@@ -8,21 +8,32 @@
 # 脚本可以重复执行，分两个阶段：
 #
 #   阶段一（现在就能跑）：装 Nginx、建站点目录，装上一份「只走 HTTP」的配置。
-#   阶段二（备案通过、把域名解析切到本机之后再跑一次）：检测到域名已指向本机，
-#          自动用 certbot 签发证书，并切换到「HTTP 301 + HTTPS」的正式配置。
+#   阶段二（证书就位之后再跑一次）：切换到「HTTP 301 + HTTPS」的正式配置。
 #
-# 为什么不能第一次就签证书：Let's Encrypt 的 HTTP-01 验证要求域名解析指向本机，
+# 证书有两种来源，用 --cert-source 选（默认 letsencrypt）：
+#
+#   letsencrypt  脚本自己用 certbot 走 HTTP-01 签发，证书落在
+#                /etc/letsencrypt/live/<主域名>/，续期交给 certbot.timer。
+#                代价是必须等备案通过、域名解析切到本机之后才能签。
+#   tencent      用腾讯云免费 DV 证书（TrustAsia C1，单域名、3 个月）。
+#                证书由 tools/ssl-renew.mjs + .github/workflows/renew-server-cert.yml
+#                申请和续期，脚本只负责把它们装进
+#                /etc/nginx/ssl/<域名>/，本脚本不再碰 certbot。
+#                好处是域名没备案也能先签（走 DNS 验证），续期全自动。
+#
+# 为什么 letsencrypt 不能第一次就签：HTTP-01 验证要求域名解析指向本机，
 # 而大陆机器在备案通过前不能拿未备案域名对外服务，所以顺序只能是
 # 先备案 → 再切解析 → 再签证书。
 #
 # 参数：
-#   --email <地址>    必填，Let's Encrypt 到期通知邮箱
+#   --email <地址>    Let's Encrypt 到期通知邮箱；--cert-source letsencrypt 时必填
 #   --domain <域名>   主域名，默认 blog.guangluo.top
 #   --aliases "<域名…>"  一起签发证书并 301 到主站的备用域名，
 #                     默认 "www.guangluo.top guangluo.top"；传空字符串表示只要主域名
+#   --cert-source <letsencrypt|tencent>  证书来源，默认 letsencrypt
 #   --owner <用户>    站点目录属主（也就是 GitHub Actions 里的 SERVER_USER），默认 root
 #   --staging         用 Let's Encrypt 测试环境签发（调试用，浏览器不信任）
-#   --skip-cert       只初始化，不尝试签发证书
+#   --skip-cert       只初始化，不尝试签发证书（只对 letsencrypt 有意义）
 #   -h | --help       显示帮助
 #
 set -euo pipefail
@@ -31,14 +42,21 @@ DOMAIN='blog.guangluo.top'
 ALIASES='www.guangluo.top guangluo.top'
 SITE_ROOT='/var/www/blog.guangluo.top'
 ACME_ROOT='/var/www/acme'
+# 腾讯云免费证书走文件验证时，验证文件挂在这个目录（独立于站点根目录，
+# 所以 GitHub Actions 的 rsync --delete 不会把它删掉）。
+PKI_ROOT='/var/www/pki-validation'
 OWNER='root'
 EMAIL=''
+CERT_SOURCE='letsencrypt'
 STAGING=0
 SKIP_CERT=0
 
 AVAILABLE='/etc/nginx/sites-available/blog.guangluo.top'
 ENABLED='/etc/nginx/sites-enabled/blog.guangluo.top'
-CERT_DIR=''
+# 证书根目录：下面每个域名一个子目录，各放 fullchain.pem + privkey.pem。
+# letsencrypt 时 certbot 只给「主域名」建目录，备用域名共用它那份（一张证书带 SAN）；
+# tencent 时每个域名各有各的目录（免费证书是单域名，只能一张一个）。
+CERT_BASE=''
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[!]\033[0m %s\n' "$*"; }
@@ -46,22 +64,28 @@ die() { printf '\033[1;31m[x]\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
   # 通过 stdin 运行时（ssh root@… 'bash -s' < deploy/server-setup.sh）$0 是 bash，
-  # 不能拿它去读脚本自身的注释，所以这里固定输出用法。
+  # 不能拿它去读脚本自身的注释，所以下面准备了固定输出的兜底分支。
+  #
+  # 用法文本从头部注释里现取：从第 3 行起逐行打印注释，遇到「-h | --help」那一行
+  # 或第一行非注释就停（后面 Nginx 模板的 heredoc 里也有顶格的 # 行，不能一路打印过去），
+  # 所以以后在头部加几行说明，--help 不会错位。
   if [ -r "$0" ] && head -1 "$0" 2>/dev/null | grep -q '^#!'; then
-    sed -n '3,28p' "$0" | sed 's/^#\s\?//'
+    awk 'NR > 2 { if (/^#/) { print; if ($0 ~ /^#   -h \| --help/) exit } else exit }' "$0" \
+      | sed 's/^#[[:space:]]\{0,1\}//'
   else
     cat <<'USAGE'
 用法（在本地执行，脚本经 stdin 送到服务器）：
   ssh root@<公网IP> 'bash -s' -- --email you@example.com < deploy/server-setup.sh
 
 参数：
-  --email <地址>        必填，Let's Encrypt 到期通知邮箱（用 --skip-cert 时可不填）
+  --email <地址>        Let's Encrypt 到期通知邮箱（--cert-source letsencrypt 时必填）
   --domain <域名>       主域名，默认 blog.guangluo.top
   --aliases "<域名…>"   一起签发证书并 301 到主站的备用域名，
                         默认 "www.guangluo.top guangluo.top"；传空字符串表示只要主域名
+  --cert-source <letsencrypt|tencent>  证书来源，默认 letsencrypt（见脚本头部注释）
   --owner <用户>        站点目录属主（GitHub Actions 里的 SERVER_USER），默认 root
   --staging             用 Let's Encrypt 测试环境签发（调试用，浏览器不信任）
-  --skip-cert           只初始化，不尝试签发证书
+  --skip-cert           只初始化，不尝试签发证书（只对 letsencrypt 有意义）
   -h | --help           显示帮助
 USAGE
   fi
@@ -72,6 +96,7 @@ while [ $# -gt 0 ]; do
     --email) EMAIL="${2:-}"; shift 2 ;;
     --domain) DOMAIN="${2:-}"; shift 2 ;;
     --aliases) ALIASES="${2:-}"; shift 2 ;;
+    --cert-source) CERT_SOURCE="${2:-}"; shift 2 ;;
     --owner) OWNER="${2:-}"; shift 2 ;;
     --staging) STAGING=1; shift ;;
     --skip-cert) SKIP_CERT=1; shift ;;
@@ -81,22 +106,70 @@ while [ $# -gt 0 ]; do
 done
 
 [ "$(id -u)" -eq 0 ] || die '需要 root 权限：ssh root@<公网IP> 或用 sudo 运行'
-if [ "$SKIP_CERT" -eq 0 ] && [ -z "$EMAIL" ]; then
+case "$CERT_SOURCE" in
+  letsencrypt) CERT_BASE='/etc/letsencrypt/live' ;;
+  tencent)     CERT_BASE='/etc/nginx/ssl' ;;
+  *) die "未知的 --cert-source：$CERT_SOURCE（可选 letsencrypt / tencent）" ;;
+esac
+# 只有「真的要用 certbot 签」才强求邮箱；tencent 来源由 workflow 申请证书，脚本不需要邮箱
+if [ "$SKIP_CERT" -eq 0 ] && [ "$CERT_SOURCE" = letsencrypt ] && [ -z "$EMAIL" ]; then
   die '缺少 --email（Let'"'"'s Encrypt 的到期通知邮箱）'
 fi
 
-CERT_DIR="/etc/letsencrypt/live/$DOMAIN"
 SERVER_NAMES="$DOMAIN${ALIASES:+ $ALIASES}"
+
+# 某个域名该用哪份证书：
+#   1. 自己的目录有证书就用自己那份（tencent：每个域名一张）；
+#   2. 否则退回主域名那份（letsencrypt：certbot 的一张证书带全部 SAN）；
+#   3. 两份都没有就返回非零，调用方据此决定「这个域名暂时不上 443」。
+cert_dir_for() {
+  local host="$1"
+  if [ -f "$CERT_BASE/$host/fullchain.pem" ]; then
+    printf '%s' "$CERT_BASE/$host"
+    return 0
+  fi
+  if [ "$host" != "$DOMAIN" ] && [ -f "$CERT_BASE/$DOMAIN/fullchain.pem" ]; then
+    printf '%s' "$CERT_BASE/$DOMAIN"
+    return 0
+  fi
+  return 1
+}
+
+# 这份证书真的覆盖这个域名吗？看 SAN 列表。
+# letsencrypt 那张证书三个域名都在 SAN 里，所以备用域名会共用它上 443；
+# 腾讯云免费证书是单域名，某个备用域名自己的证书还没到位时，宁可不上 443，
+# 也不要拿一张不覆盖它的证书去握手（那样浏览器只会报域名不匹配，更难查）。
+# openssl 不可用或读不出 SAN 时按「覆盖」处理，也就是退回旧行为，不因为读不到就少配一块。
+cert_covers() {
+  local dir="$1" host="$2" sans
+  command -v openssl >/dev/null 2>&1 || return 0
+  sans=$(openssl x509 -in "$dir/fullchain.pem" -noout -text 2>/dev/null \
+    | grep -o 'DNS:[^,]*' | sed 's/^DNS://' | tr -d ' ')
+  [ -n "$sans" ] || return 0
+  printf '%s\n' "$sans" | grep -qx "$host" && return 0
+  # 通配符：*.guangluo.top 覆盖 www.guangluo.top，但不覆盖裸域 guangluo.top
+  printf '%s\n' "$sans" | grep -qx "*.${host#*.}" && return 0
+  return 1
+}
 
 # ---------------------------------------------------------------------------
 # 1. 依赖
 # ---------------------------------------------------------------------------
-log '安装 nginx / certbot / rsync'
+log '安装 nginx / rsync / curl / openssl'
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq nginx certbot python3-certbot-nginx rsync curl >/dev/null
+apt-get install -y -qq nginx rsync curl openssl >/dev/null
+if [ "$CERT_SOURCE" = letsencrypt ]; then
+  log '安装 certbot（--cert-source letsencrypt）'
+  apt-get install -y -qq certbot python3-certbot-nginx >/dev/null
+fi
 
 mkdir -p "$SITE_ROOT" "$ACME_ROOT/.well-known/acme-challenge"
+# 腾讯云免费证书的文件验证目录：与站点根目录分开，rsync --delete 删不掉它
+mkdir -p "$PKI_ROOT/.well-known/pki-validation"
+if [ "$CERT_SOURCE" = tencent ]; then
+  mkdir -p "$CERT_BASE"
+fi
 # 站点目录要先有一个可访问的页面，Nginx 才不至于因为空目录报错
 if [ ! -e "$SITE_ROOT/index.html" ]; then
   printf '<!doctype html><meta charset="utf-8"><title>%s</title><p>站点已就绪，等待首次发布。\n' "$DOMAIN" \
@@ -128,6 +201,12 @@ server {
         default_type "text/plain";
     }
 
+    # 腾讯云免费证书的文件验证路径（trustasia 会来取这个文件）
+    location ^~ /.well-known/pki-validation/ {
+        root __PKI_ROOT__;
+        default_type "text/plain";
+    }
+
     location / {
         try_files $uri $uri/index.html $uri/ =404;
     }
@@ -139,7 +218,7 @@ NGINX
 
 write_https_config() {
   cat <<'NGINX'
-# HTTP：只做两件事——转发 certbot 的验证请求，其余全部 301 到 HTTPS。
+# HTTP：只做三件事——转发两家的域名验证请求，其余全部 301 到 HTTPS。
 server {
     listen 80;
     listen [::]:80;
@@ -147,6 +226,13 @@ server {
 
     location ^~ /.well-known/acme-challenge/ {
         root __ACME_ROOT__;
+        default_type "text/plain";
+    }
+
+    # 腾讯云免费证书的文件验证路径。证书续期时 workflow 会把验证文件放进来，
+    # 所以这条在 80 端口的「全部 301」之前必须保留。
+    location ^~ /.well-known/pki-validation/ {
+        root __PKI_ROOT__;
         default_type "text/plain";
     }
 
@@ -162,8 +248,8 @@ server {
     http2 on;                       # 需要 nginx >= 1.25.1，Debian 13 自带 1.26
     server_name __DOMAIN__;
 
-    ssl_certificate         __CERT_DIR__/fullchain.pem;
-    ssl_certificate_key     __CERT_DIR__/privkey.pem;
+    ssl_certificate         __CERT_BASE__/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key     __CERT_BASE__/__DOMAIN__/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 1d;
@@ -213,15 +299,30 @@ server {
 NGINX
 }
 
-write_https_alias_block() {
-  cat <<'NGINX'
+# 备用域名统一 301 到主站，避免搜索引擎把同一个站点分别收录。
+# 一个域名一个 server 块（腾讯云免费证书是单域名，每家一份证书目录），
+# 所以这里按域名逐个生成；证书还没到位的域名先不上 443，只保留 80 端口的 301。
+# 注意 __ALIAS__ 是在循环里就地替换的（每个块的值都不一样），
+# 其余占位符仍然由下面的 fill_placeholders 统一处理。
+write_https_alias_blocks() {
+  local alias cert_dir
+  for alias in $ALIASES; do
+    if ! cert_dir=$(cert_dir_for "$alias"); then
+      warn "$alias 还没有证书，暂时只在 80 端口做 301（拿到证书后重跑本脚本即可上 443）"
+      continue
+    fi
+    if ! cert_covers "$cert_dir" "$alias"; then
+      warn "$alias 只能拿到 $cert_dir 那份证书，它不覆盖这个域名，先不上 443（等它自己的证书到位）"
+      continue
+    fi
+    cat <<'NGINX' | sed -e "s|__ALIAS__|$alias|g" -e "s|__CERT_DIR__|$cert_dir|g"
 
-# HTTPS：备用域名统一 301 到主站，避免搜索引擎把同一个站点分别收录
+# HTTPS：备用域名 301 到主站
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
     http2 on;
-    server_name __ALIASES__;
+    server_name __ALIAS__;
 
     ssl_certificate     __CERT_DIR__/fullchain.pem;
     ssl_certificate_key __CERT_DIR__/privkey.pem;
@@ -229,15 +330,16 @@ server {
     return 301 https://__DOMAIN__$request_uri;
 }
 NGINX
+  done
 }
 
 fill_placeholders() {
   sed -e "s|__SERVER_NAMES__|$SERVER_NAMES|g" \
       -e "s|__SITE_ROOT__|$SITE_ROOT|g" \
       -e "s|__ACME_ROOT__|$ACME_ROOT|g" \
-      -e "s|__DOMAIN__|$DOMAIN|g" \
-      -e "s|__CERT_DIR__|$CERT_DIR|g" \
-      -e "s|__ALIASES__|$ALIASES|g"
+      -e "s|__PKI_ROOT__|$PKI_ROOT|g" \
+      -e "s|__CERT_BASE__|$CERT_BASE|g" \
+      -e "s|__DOMAIN__|$DOMAIN|g"
 }
 
 # 装上配置并用 nginx -t 校验；校验失败就回滚到上一份，绝不让 nginx 起不来
@@ -252,7 +354,7 @@ install_config() {
   {
     "$builder"
     if [ -n "$ALIASES" ] && [ "$builder" = write_https_config ]; then
-      write_https_alias_block
+      write_https_alias_blocks
     fi
   } | fill_placeholders > "$target"
 
@@ -323,11 +425,34 @@ done
 
 # ---------------------------------------------------------------------------
 # 4. 装配置
+#
+# 上 HTTPS 配置有两个条件：主域名有证书，**并且**域名已经指向本机。
+# 两种来源的「有证书」都落在 $CERT_BASE/$DOMAIN/fullchain.pem 上，所以这里不用分来源。
+#
+# 为什么要看解析：腾讯云免费证书可以在备案通过前就签好。那时候域名还没资格指向
+# 大陆机器，站点得靠 IP 直接访问；要是这时就装上「HTTP 全部 301 到 https://域名」的
+# 正式配置，用 IP 访问会被跳到一个还不通的地方，等于把备案前的入口弄没了。
+# 所以证书先放着，等域名真的指过来（备案通过、Cloudflare 改灰云）再上 HTTPS。
+# letsencrypt 那条路不受影响：证书本来就是解析到位之后才签得出来的。
 # ---------------------------------------------------------------------------
-if [ -f "$CERT_DIR/fullchain.pem" ]; then
+MAIN_CERT_DIR=''
+MAIN_CERT_DIR=$(cert_dir_for "$DOMAIN" || true)
+
+# 探测不到本机公网 IP 时没法判断解析，就按「已指向」处理：
+# 宁可上 HTTPS，也别因为认不出 IP 把站点一直按在 HTTP 上。
+DOMAIN_POINTS_HERE=1
+if [ -n "$SERVER_IP" ] && ! resolves_here "$DOMAIN"; then
+  DOMAIN_POINTS_HERE=0
+fi
+
+if [ -n "$MAIN_CERT_DIR" ] && [ "$DOMAIN_POINTS_HERE" -eq 1 ]; then
   install_config write_https_config
 else
   install_config write_bootstrap_config
+  if [ -n "$MAIN_CERT_DIR" ]; then
+    warn "$DOMAIN 还没指向本机${SERVER_IP:+（本机公网 IP：$SERVER_IP）}，证书先放着，配置保持 HTTP。"
+    warn "这样备案通过前还能直接用 IP 访问；等解析切到本机后重跑本脚本，或者跑一次 renew-server-cert 并勾上 refresh，就会自动切到 HTTPS。"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -336,9 +461,12 @@ fi
 # 比「解析出来的 IP 等于本机公网 IP」可靠得多：把探测文件写进 ACME 目录，
 # 再从公网按域名取回来，内容一致就说明解析、80 端口和 nginx 的 ACME 路径全都通了。
 # 云厂商的 NAT 公网 IP、IPv6、CDN 代理这些情况也一并覆盖。
+#
+# 只有 letsencrypt 需要这一步：tencent 来源的证书由 workflow 走 DNS 验证申请，
+# 跟本机解析、80 端口都没关系。
 # ---------------------------------------------------------------------------
 ACME_READY=1
-if [ "$SKIP_CERT" -eq 0 ] && [ ! -f "$CERT_DIR/fullchain.pem" ]; then
+if [ "$CERT_SOURCE" = letsencrypt ] && [ "$SKIP_CERT" -eq 0 ] && [ -z "$MAIN_CERT_DIR" ]; then
   for host in $SERVER_NAMES; do
     token="probe-$$-$RANDOM"
     printf '%s' "$token" > "$ACME_ROOT/.well-known/acme-challenge/$token"
@@ -354,12 +482,21 @@ if [ "$SKIP_CERT" -eq 0 ] && [ ! -f "$CERT_DIR/fullchain.pem" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 5. 签发证书
+# 5. 证书
 # ---------------------------------------------------------------------------
-if [ "$SKIP_CERT" -eq 1 ]; then
+if [ "$CERT_SOURCE" = tencent ]; then
+  # 证书不在这里签发：tools/ssl-renew.mjs 负责申请（DNS 验证）和续期，
+  # 本脚本只负责把 /etc/nginx/ssl/<域名>/ 里的证书接进 Nginx 配置。
+  if [ -n "$MAIN_CERT_DIR" ]; then
+    log "已装好证书：$MAIN_CERT_DIR（续期由 GitHub Actions 的 renew-server-cert 负责）"
+  else
+    warn "还没有 $DOMAIN 的证书，站点暂时只走 HTTP。"
+    warn '先跑一次 renew-server-cert 工作流（或本地 node tools/ssl-renew.mjs），把证书装进 /etc/nginx/ssl/，再重跑本脚本。'
+  fi
+elif [ "$SKIP_CERT" -eq 1 ]; then
   warn '按 --skip-cert 跳过证书签发'
-elif [ -f "$CERT_DIR/fullchain.pem" ]; then
-  log "已存在证书（$CERT_DIR），跳过签发；续期由 certbot.timer 负责"
+elif [ -n "$MAIN_CERT_DIR" ]; then
+  log "已存在证书（$MAIN_CERT_DIR），跳过签发；续期由 certbot.timer 负责"
 elif [ "$ACME_READY" -ne 1 ]; then
   warn '域名还没指向本机，先不签发证书（也可能是 80 端口没放行，或还挂着 CDN 代理）。'
   warn "备案通过后把 $SERVER_NAMES 的 A 记录指向本机公网 IP${SERVER_IP:+（$SERVER_IP）}，Cloudflare 关掉橙云代理，再跑一次本脚本即可。"
@@ -380,7 +517,9 @@ else
   fi
 fi
 
-systemctl enable --now certbot.timer >/dev/null 2>&1 || true
+if [ "$CERT_SOURCE" = letsencrypt ]; then
+  systemctl enable --now certbot.timer >/dev/null 2>&1 || true
+fi
 
 # ---------------------------------------------------------------------------
 # 6. 收尾提示
@@ -393,13 +532,18 @@ cat <<EOF
   站点根目录   $SITE_ROOT
   站点属主     $OWNER（GitHub Actions 里的 SERVER_USER 要与它一致）
   Nginx 配置   $AVAILABLE
-  证书目录     $CERT_DIR
+  证书来源     $CERT_SOURCE
+  证书根目录   $CERT_BASE${MAIN_CERT_DIR:+（$DOMAIN 用 $MAIN_CERT_DIR）}
   本机公网 IP  ${SERVER_IP:-未能自动识别，以腾讯云控制台显示的为准}
 
 接下来：
   1. 腾讯云控制台 → 安全组 → 放行 22 / 80 / 443
   2. 备案通过后，把 $SERVER_NAMES 的 A 记录指向本机公网 IP，
      Cloudflare 上必须改成 DNS only（灰云），代理开着会让备案核查看到 Cloudflare 的 IP
+EOF
+
+if [ "$CERT_SOURCE" = letsencrypt ]; then
+  cat <<EOF
   3. 再跑一次本脚本签发证书：
      ssh root@<公网IP> 'bash -s' -- --email ${EMAIL:-<你的邮箱>} < deploy/server-setup.sh
   4. 在 GitHub 仓库打开自动发布：
@@ -408,5 +552,23 @@ cat <<EOF
 
 证书续期由 systemctl 的 certbot.timer 负责，可用下面这条确认：
   systemctl list-timers certbot.timer
+EOF
+else
+  cat <<EOF
+  3. 在 GitHub 仓库打开证书自动续期：
+     Variables: SERVER_CERT_RENEW=true
+     Secrets:   TENCENT_SECRET_ID / TENCENT_SECRET_KEY（腾讯云 CAM 密钥，证书相关权限）
+                CLOUDFLARE_DNS_TOKEN（Cloudflare Token，Zone → DNS → Edit）
+                以及 SERVER_HOST / SERVER_USER / SERVER_SSH_KEY（与发布通道共用）
+  4. 手动跑一次 renew-server-cert 工作流，它会申请证书、装进 $CERT_BASE，
+     然后调用本脚本重写 Nginx 配置，站点才会上 HTTPS
+  5. 在 GitHub 仓库打开自动发布：
+     Variables: SERVER_DEPLOY=true（可选 SERVER_DEPLOY_PATH）
+
+证书每 3 个月到期一次，renew-server-cert 每月检查一次、剩余不足 21 天就换新。
+EOF
+fi
+
+cat <<'EOF'
 ——————————————————————————————————————————————
 EOF
