@@ -31,6 +31,13 @@ updates:
       bun-minor-patch:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      # js-yaml 5 改了导出，Hexo 侧的传递依赖 js-yaml-js-types 直接抛
+      # `TypeError: Type is not a constructor`，构建起不来（2026-10-17 实测 PR #30）。
+      # 这条是上游卡住的，不是我们能修的：等 hexo 换掉 js-yaml 5 再放开。
+      # 只挡主版本，4.x 的补丁与次版本照常走上面的分组。
+      - dependency-name: "js-yaml"
+        update-types: ["version-update:semver-major"]
 
   # .github/workflows/ 里用到的 action
   - package-ecosystem: github-actions
