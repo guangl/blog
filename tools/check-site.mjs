@@ -21,6 +21,19 @@ function files(dir) {
   });
 }
 
+// 把 URL 路径统一解码，便于和主题输出的裸 Unicode 路径比较；
+// 非法转义序列保持原样，交给后续比较报错。
+function decodeURIPath(value) {
+  if (!value) return value;
+  try {
+    const url = new URL(value);
+    url.pathname = decodeURI(url.pathname);
+    return url.href;
+  } catch {
+    return value;
+  }
+}
+
 function localTarget(value, base, context) {
   if (!value || /^(?:#|data:|mailto:|tel:|javascript:)/i.test(value)) return;
   const url = new URL(value, base);
@@ -39,7 +52,8 @@ function localTarget(value, base, context) {
 
 assert(existsSync(output), 'Run bun run build before checking the site.');
 for (const path of ['index.html', 'posts/index.html', 'about/index.html', 'subscribe/index.html', 'archives/index.html',
-  'categories/index.html', 'tags/index.html', '404.html', 'atom.xml', 'search.json', 'sitemap.xml', 'robots.txt']) {
+  'categories/index.html', 'tags/index.html', 'topic/index.html', 'notebooks/index.html', 'notebooks/dba/index.html',
+  '404.html', 'atom.xml', 'search.json', 'sitemap.xml', 'robots.txt']) {
   report(existsSync(resolve(output, path)), `Missing required page: ${path}`);
 }
 
@@ -48,8 +62,9 @@ const articles = [];
 for (const file of pages) {
   const path = relative(output, file).split(sep).join('/');
   const url = new URL(path, site);
-  const $ = load(readFileSync(file, 'utf8'));
-  report(!unescapeHTML(readFileSync(file, 'utf8')).includes('https://guangl.github.io/blog'), `${path}: stale GitHub Pages URL`);
+  const raw = readFileSync(file, 'utf8');
+  const $ = load(raw);
+  report(!unescapeHTML(raw).includes('https://guangl.github.io/blog'), `${path}: stale GitHub Pages URL`);
   report(Boolean($('title').text().trim()), `${path}: missing title`);
   report(Boolean($('meta[name="description"]').attr('content')), `${path}: missing description`);
   if (path === 'index.html') {
@@ -58,10 +73,28 @@ for (const file of pages) {
   }
   report($('main, [role="main"]').length === 1, `${path}: missing main landmark`);
   report(($('meta[name="viewport"]').attr('content') || '').includes('width=device-width'), `${path}: missing responsive viewport`);
+  // SEO：作者 CDN 的占位图不应出现在页面里（应使用本站 fallbacks.cover / avatar）
+  report(!raw.includes('cdn-x/placeholder'), `${path}: references theme author placeholder CDN`);
+  // SEO：结构化数据的图片必须是绝对 URL，schema.org 不接受相对路径
+  for (const block of $('script[type="application/ld+json"]').toArray()) {
+    let data;
+    try { data = JSON.parse($(block).text()); } catch { continue; }
+    for (const item of (Array.isArray(data) ? data : [data])) {
+      if (!item || item['@type'] !== 'BlogPosting') continue;
+      const images = Array.isArray(item.image) ? item.image : item.image ? [item.image] : [];
+      for (const image of images) {
+        const value = typeof image === 'string' ? image : image && image.url;
+        if (typeof value === 'string' && value.length > 0) {
+          report(/^https?:\/\//.test(value), `${path}: structured data image is not absolute: ${value}`);
+        }
+      }
+    }
+  }
   const canonical = $('link[rel="canonical"]');
   if (path !== '404.html') {
     report(canonical.length === 1, `${path}: expected one canonical URL`);
-    report(canonical.attr('href') === new URL(path.replace(/index\.html$/, ''), site).href,
+    // 主题输出裸 Unicode 路径，new URL() 会做百分号编码；两者语义相同，比较时统一解码。
+    report(decodeURIPath(canonical.attr('href')) === decodeURIPath(new URL(path.replace(/index\.html$/, ''), site).href),
       `${path}: incorrect canonical URL`);
   } else {
     report(canonical.length === 0, '404 page must not have a canonical URL');
