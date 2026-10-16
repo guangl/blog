@@ -1,7 +1,46 @@
 version: 2
+# 依赖更新（Dependabot）。
+#
+# 生态选择（重点，别随手改回 npm）：
+#   本仓库用 bun 管理依赖：package.json 里 packageManager 是 bun@1.4.3，锁文件是文本格式的 bun.lock。
+#   Dependabot 从 2025-02 起正式支持 bun 生态（YAML 值就是 `bun`），要求 Bun >= 1.1.39，
+#   只认文本 bun.lock、不认旧的二进制 bun.lockb——本仓库两条都满足。
+#   所以这里用 bun：它读 package.json + bun.lock，开出来的 PR 会把 bun.lock 一起更新，
+#   CI 里的 `bun install --frozen-lockfile` 才有机会直接通过。
+#   不要改成 npm：npm 生态读的是 package-lock.json（本仓库没有这个文件），
+#   就算 PR 改了 package.json，bun.lock 也不会跟着动，`bun install --frozen-lockfile` 会直接失败，
+#   等于每条依赖 PR 都得人工再跑一次 `bun install` 补锁文件。
+#   已知限制：bun 生态目前只支持「版本更新」，Dependabot 的「安全更新」（security updates）还不支持 bun，
+#   所以安全告警不会自动开 PR，仍需定期 `bun update` / 看仓库的 Dependabot alerts。
+#
+# 节奏：每周一次（周一 09:00 北京时间），够用又不吵；同时最多 5 个 PR 排队。
 updates:
-- package-ecosystem: npm
-  directory: "/"
-  schedule:
-    interval: daily
-  open-pull-requests-limit: 20
+  # Hexo 本体、主题、插件与构建期依赖（devDependencies 也一起管）
+  - package-ecosystem: bun
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    # 补丁与次版本合成一个 PR，少开一堆没人逐条看的单；主版本可能有破坏性改动，仍然单独开。
+    groups:
+      bun-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # .github/workflows/ 里用到的 action
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      github-actions-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

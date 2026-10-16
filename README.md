@@ -43,12 +43,14 @@ bun run clean
 - Stellar 本地全文搜索、文章字数与阅读时长、代码复制、文章链接分享。
 - Stellar 原生浅色 / 深色 / 跟随系统三种外观。
 - 全文 Atom 订阅：<https://blog.guangluo.top/atom.xml>。
-- 站点地图、robots.txt、规范链接、主题自带的 Open Graph 与结构化数据。
+- 站点地图、robots.txt、规范链接、主题自带的 Open Graph 与结构化数据；所有页面都有 1200×630 的社交卡片图与 `summary_large_image` 卡片（见 [SEO 与分享](#seo-与分享)）。
 - 搜索引擎收录支持：站长平台验证 meta、IndexNow 密钥文件、发布后自动推送（见 [SEO 与分享](#seo-与分享)）。
 - 响应式图片：构建期给照片生成 JPEG / WebP / AVIF 多档变体，用 `<picture>` + `srcset` 按屏幕宽度取图（见 [图片](#图片)）。
 - 安全响应头与缓存策略：构建期生成 Cloudflare Pages 的 `_headers`，含 HSTS、CSP、Permissions-Policy（见 [响应头与缓存](#响应头与缓存)）。
-- 无障碍：每页恰好一个 `h1`、每张图都有 `alt`、首页 Hero 文字对比度 6.27:1（见 [无障碍](#无障碍)）。
+- 无障碍：每页恰好一个 `h1`、每张图都有 `alt`、可缩放的 viewport、「跳到主要内容」链接、首页 Hero 文字对比度 6.27:1（见 [无障碍](#无障碍)）。
 - 本地图标（`favicon.ico` 多尺寸 + `apple-touch-icon.png`）与 404 插图；照片提供封面、正文预览图和大图入口。
+- 拍摄参数卡片：文章末尾列出机身 / 镜头 / 焦距 / 光圈 / 快门 / 感光度 / 滤镜 / 时间 / 地点，手写值优先、原图 EXIF 自动补（见 [拍摄参数与相册](#拍摄参数与相册)）。
+- 相册页 `/gallery/`：构建期把全部文章的正文照片按时间从新到旧铺成网格，点开是灯箱大图、点标题进文章（见 [拍摄参数与相册](#拍摄参数与相册)）。
 - 文章和页脚使用与仓库一致的 CC BY 4.0 协议。
 
 ## 写文章
@@ -75,6 +77,23 @@ cover: /2026/10/16/文章标题/cover.jpg
 
 站点时区为 `Asia/Shanghai`；未来日期的内容不会提前发布（`future: false`），日期写到明天就会「生成了但产物里没有」，排查时先看这个。修改文章时手动更新 `updated`，避免每次部署把旧文章误标为刚刚更新。
 
+拍摄参数**不写在 front-matter 里**：Stellar 2.0 的 front-matter schema 是封闭的，多一个 `photo:` 会被判成未知字段丢掉、并每次构建告警一行。写在 [`source/_data/photos.yml`](source/_data/photos.yml)，键是文章文件名（slug）：
+
+```yaml
+hankou-river-beach:
+  camera: SONY ILCE-7M5
+  focal: 28
+  aperture: 10
+  shutter: 330
+  iso: 50
+  filter: ND64000 减光镜
+  location: 武汉 · 汉口江滩
+```
+
+只写确定的值；没写的字段从原图 EXIF 自动补，两处都没有的字段不显示。详见 [拍摄参数与相册](#拍摄参数与相册)。
+
+相册页不用维护：新文章只要正文里有图（或至少有 `cover`），构建时会自动出现在 `/gallery/`。
+
 ## 图片
 
 照片是本站的主体，构建期由 `scripts/image-pipeline.js` 统一处理，**不需要手工导出多份尺寸**：只要把图放进文章资源目录，构建时会按 `480 / 960 / 1600`（超过 2560 的源图封顶 2560）生成 JPEG / WebP / AVIF 变体，写进产物目录（`public/` 与 `public-domain/` 都不提交进仓库），并把正文里的 `<img>` 改写成 `<picture>`：
@@ -98,13 +117,49 @@ bun run images:compress   # 真正重压（长边 >3840 或 >1.5MB 的 JPEG）
 
 现有那张 `main.jpg` 已经从 7008×4672 / 4.08MB 压到 3840×2560 / 0.44MB（省 90%），所以正文里的说法是「查看大图」而不是「查看原图」——真正未压缩的原始文件在 Git 历史里（`git log --follow -- source/_posts/hankou-river-beach/main.jpg`）。
 
+## 拍摄参数与相册
+
+### 拍摄参数卡片
+
+`scripts/photo-meta.js` 在文章正文末尾插一张「拍摄参数」卡片，数据两个来源，前者优先：
+
+| 来源 | 位置 | 说明 |
+| --- | --- | --- |
+| 手写 | `source/_data/photos.yml` | 键是文章文件名（slug），只写确定的值 |
+| 原图 EXIF | `source/_posts/<slug>/` 下的 jpg/png | 用 `exifr` 读，不手抄 |
+
+为什么手写的不放 front-matter：Stellar 2.0 的 front-matter schema 是**封闭**的（`node_modules/hexo-theme-stellar/scripts/schema/content-config-rules.js` 里逐字段声明），多写一个 `photo:` 会被判成「未知字段」丢掉，而且每次构建都告警一行。放进 `_data/photos.yml` 同样醒目、还不用和主题的 schema 打架；对一张「拍摄参数表」来说，集中一处其实更好查。自检会守住「`photos.yml` 里写的每个字段都必须真的渲染到对应文章页上」——写了不生效比不写更糟。
+
+为什么还要读 EXIF：本站照片在发布前被 `tools/optimize-images.mjs` 重压过，**EXIF 已经被剥掉**（只剩尺寸标签），所以现有文章只能手写；以后直接丢进来的相机原片会自带 EXIF，卡片就能自己长出来。2026-10-17 用一张手工拼出来的带 ExifIFD 的测试图验过整条链路：机身、镜头、焦距、光圈、快门（`0.005` → `1/200s`）、ISO、拍摄时间都能自动填对。两个刻意的取舍：
+
+- **不输出 GPS**。EXIF 里的经纬度能精确到几米，写进公开网页等于把坐标交给搜索引擎和 Git 历史，所以地点只认手写的 `location`。
+- **`DateTimeOriginal` 按相机记录的墙上时间输出**，不做时区换算（只取年月日时分），否则同一张照片会因为构建机器的时区而挪几个小时。
+
+想给某篇文章关掉卡片，把它的值写成 `false`。字段名与显示名：`camera` 机身、`lens` 镜头、`focal` 焦距、`aperture` 光圈、`shutter` 快门、`iso` 感光度、`filter` 滤镜、`taken` 拍摄时间、`location` 地点。
+
+### 相册页
+
+`scripts/gallery.js` 在构建期扫全部文章，把正文里显示出来的照片按发布时间从新到旧拼成网格，替换掉 [`source/gallery/index.md`](source/gallery/index.md) 里的 `<!-- gallery -->` 占位符——**相册不需要手工维护**，新文章有图就自动出现。取图规则：优先正文图，正文没有图就退回 `cover`；`alt` 用文章标题（多张图会带「第 N 张」）。
+
+三处与主题自带 `{% gallery %}` 标签不同，都是实测产物发现的：
+
+1. **标题放在图片下方，而不是主题的 `.image-meta` 覆盖层里**。那层是 hover 才显形、而且 `pointer-events: none` 的装饰层：鼠标点不动，触屏更没有 hover，于是「点标题进文章」是假的。现在照片本身点开灯箱（Fancybox），下面一行可点的标题进文章。
+2. **网格用 `size="xl"`（两列）+ `aspect_ratio="original"`**。主题默认的 `size="m"` 是 150px 的小格子，不适合看照片；`square` 会把横构图裁成方的——构图都变了，学摄影的站不能这么干。
+3. **`style-src` 必须放行 `gcore.jsdelivr.net`**，否则 Fancybox 的样式表被 CSP 拦掉，点击没有任何反应（见 [响应头与缓存](#响应头与缓存)）。
+
+`scripts/image-pipeline.js` 里给相册图单独写了 `sizes`（`(max-width: 992px) 50vw, 330px`），否则手机会去下 1600px 那一档。相册图靠类名 `gallery-photo` 识别——注入方显式写上，比按父容器猜可靠。
+
 ## 无障碍
 
-`scripts/a11y.js` 在构建期做三件事，都是实测产物发现的问题：
+`scripts/a11y.js` 在构建期做五件事，都是实测产物发现的问题：
 
 1. **每页恰好一个 `h1`**。主题在首页会同时输出两个：Hero 大标题和页面标题「欢迎来访」。规则是「保留第一个、其余降级为 `h2`」——首页保留 Hero 大标题，关于 / 订阅 / 组件示例这类只有页面标题的页面不受影响。降级不改外观：主题的标题样式挂在 `.title` 类上，与标签名无关（自检会核对降级后仍是 25px）。
 2. **列表页补 `h1`**。`/posts/`、`/archives/`、`/categories/*`、`/tags/*` 原本一个 `h1` 都没有。这里按 canonical 路径推一个语义标题（如「标签：武汉」「2026 年 9 月归档」），插在 `<main>` 开头并用 clip 技巧做**视觉隐藏**——不是 `display:none`，那样会被无障碍树忽略，等于没加。
 3. **图片补 `alt`**。卡片封面用同一张卡片里的文章标题；背景类图片（`class` 含 `bg`、位于 `aria-hidden` 容器内）与拿不到标题的一律 `alt=""`（明确表示装饰性，与「完全没有 `alt`」在无障碍树里是两回事）。
+4. **viewport 去掉 `maximum-scale`**。主题在 `layout/_partial/head.ejs` 里写死了 `width=device-width, initial-scale=1, maximum-scale=1`，没有配置项。`maximum-scale=1` 会禁掉双指缩放（Android Chrome 直接生效），WCAG 1.4.4「调整文字大小」不达标——想放大看照片参数的人放不大。现在构建期删掉 `maximum-scale` / `minimum-scale` / `user-scalable` 三个 token，`width` 与 `initial-scale` 原样保留。
+5. **补「跳到主要内容」链接**。主题不提供 skip link，键盘用户每次都要先走完顶栏和 Hero 的四个按钮才到正文（WCAG 2.4.1）。构建期在 `<body>` 之后插入页面里第一个可聚焦元素，指向 `<main id="main">`，并给 `main` 加 `tabindex="-1"`——不加的话部分浏览器只滚动、不移动焦点，屏幕阅读器仍停在原地。样式用「离屏直到聚焦」，不做 `display:none`。
+
+后两条是 2026-10-17 复查时补的（前三条更早就有了）。`tools/check-site.mjs` 会守住：viewport 不含 `maximum-scale`、每页恰好一个指向 `#main` 的 skip link、`#main` 带 `tabindex="-1"`。
 
 首页 Hero 的**对比度**是单独处理的，见 `_config.stellar.yml` 的 `inject.head_end`。主题只为视频 / 动效英雄加遮罩，图片英雄只有一层「底部渐隐到页面底色」，标题、简介和按钮直接压在照片上；无头 Chrome 实测修之前小字只有 2.56:1（WCAG AA 需要 4.5:1）。现在的做法是在模糊层与渐隐层之间插一层 `rgba(0,0,0,.30)` 遮罩，并把 Hero 文字一律钉成白色（用 `!important` 压过主题 adaptive-text 写在元素上的内联变量，否则换一张照片就可能翻到低对比度那一侧）。修完实测 6.27:1（主按钮反色后 21:1），浅色与深色外观都达标。
 
@@ -122,11 +177,15 @@ node tools/browser-check.mjs --shot /tmp/page-{page}.png /   # 顺便存一张�
 
 它做的是纯文本自检做不到的事：把每段压在照片上的文字**先隐藏再截图**、取文字背后区域的平均亮度算真实对比度（标题是大字门槛 3:1，简介和按钮是小字门槛 4.5:1）；统计 `h1` 数量、缺 `alt` 的图、**裂图**（`naturalWidth === 0`）；并回报控制台错误与 **CSP 违规**。它会按 `_headers` 的规则起本地服务，所以能提前验证响应头会不会把站点自己的资源挡掉——MathJax 的公式字形来自 cdnjs，`font-src` 漏一个域名就是一堆豆腐块，这个脚本第一次跑就抓到了这个问题。它需要本机有 Chrome 和 sharp，属于本地工具，不进 CI。
 
+**只量首屏之内的候选文字**（2026-10-17 修）。截图取的是视口，元素坐标落到视口外会被钳到边缘，量到的其实是照片底部那一行像素——首页的面包屑「主页」和「更新于」本来压的是页面底色，却因此被误报成 3.35:1「不足」。压在照片上的文字必然在首屏内（Hero 和文章 banner 都在顶部），跳过的部分会在输出里明确报数，不静默丢弃。
+
 ## 响应头与缓存
 
 Cloudflare Pages 的 `_headers` 由 `scripts/cloudflare-headers.js` 在构建期写进产物根目录。**不能直接放 `source/_headers`**：Hexo 会忽略 `source/` 下以 `_` 开头的文件和目录，那个文件根本不会被复制进产物。
 
-`/*` 上挂着安全头：`Strict-Transport-Security`（一年，含子域，暂不进 preload）、`Content-Security-Policy`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy`、`Cross-Origin-Resource-Policy`。CSP 里必须显式放行主题运行时按需加载的第三方来源：`gcore.jsdelivr.net`（mermaid / marked / vanilla-lazyload）、`unpkg.com`（swiper）、`cdnjs.cloudflare.com`（MathJax，含 `font-src`），以及拉取 GitHub 仓库信息的 `connect-src api.github.com`。CSP 目前含 `'unsafe-inline'`（主题有内联脚本与构建期注入的内联样式），它挡不住内联脚本注入，但仍能挡住「本站没有放行的外部来源」。
+`/*` 上挂着安全头：`Strict-Transport-Security`（一年，含子域，暂不进 preload）、`Content-Security-Policy`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy`、`Cross-Origin-Resource-Policy`。CSP 里必须显式放行主题运行时按需加载的第三方来源：`gcore.jsdelivr.net`（脚本：mermaid / marked / vanilla-lazyload；样式：Fancybox 灯箱）、`unpkg.com`（swiper）、`cdnjs.cloudflare.com`（MathJax，含 `font-src`），以及拉取 GitHub 仓库信息的 `connect-src api.github.com`。CSP 目前含 `'unsafe-inline'`（主题有内联脚本与构建期注入的内联样式），它挡不住内联脚本注入，但仍能挡住「本站没有放行的外部来源」。
+
+`style-src` 里的 `gcore.jsdelivr.net` 是 2026-10-17 加相册页时补的：主题的 lightbox 扩展只在页面出现 `[data-fancybox]`（相册、以后的图集）时才挂载，并从那里拉 Fancybox 的 CSS。不放行的话灯箱样式表被拦、点击没有任何反应，而控制台只在打开相册页时才会报——`bun run browser:a11y` 按 `_headers` 起本地服务，正好能提前抓到这种「只有某个页面才踩到」的 CSP 问题。`tools/check-site.mjs` 现在会断言 `style-src` 放行了它。
 
 缓存策略给 CSS / JS / 图片一周的 `stale-while-revalidate`，`sitemap.xml` / `atom.xml` / `search.json` / `robots.txt` 一小时。这里有两条 Cloudflare 的规则在约束写法，别按直觉改：
 
@@ -144,7 +203,7 @@ bun run verify
 
 此命令清理并构建站点，然后检查本地链接与资源、必要页面、规范链接、搜索索引、Atom、站点地图和版权协议。只检查已有生成结果时运行 `bun run check`。
 
-自检里还有几组「配置了就必须生效」的硬约束，都是踩过坑之后加的：每页恰好一个 `h1`、每张图都有 `alt`、`<picture>` 必须带 `srcset` 与尺寸、`_headers` 的安全头与缓存规则齐全、`favicon.ico` / `apple-touch-icon.png` / `/examples/` 必须在产物里、站点地图不许有重复 URL。改这些地方时别把自检一起改松——它失败是有原因的。
+自检里还有几组「配置了就必须生效」的硬约束，都是踩过坑之后加的：每页恰好一个 `h1`、每张图都有 `alt`、viewport 里不许有缩放锁、每页要有指向 `#main` 的 skip link、社交卡片图不能是站点头像、`<picture>` 必须带 `srcset` 与尺寸、`_headers` 的安全头与缓存规则齐全、`favicon.ico` / `apple-touch-icon.png` / `/examples/` 必须在产物里、站点地图不许有重复 URL 且带图的文章必须有图片记录。改这些地方时别把自检一起改松——它失败是有原因的。
 
 ```bash
 bun run verify:domain     # 生成并验证 Cloudflare 上传目录 public-domain/
@@ -155,6 +214,23 @@ bun run browser:a11y      # 无头 Chrome 实测对比度、裂图、CSP（本�
 Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建并发布到 Cloudflare Pages。Cloudflare 自动发布需要先添加仓库 Secret `CLOUDFLARE_API_TOKEN`，设置方法见 [域名部署说明](docs/domain-deployment.md)。检查通过后才会发布。`bun run deploy` 尚未配置 Hexo 部署适配器。
 
 仓库还有第二条发布通道：`.github/workflows/deploy-server.yml` 用 rsync 把 `public-domain/` 同步到腾讯云 ECS（大陆主站，Nginx 直接托管静态文件）。它默认关闭，用仓库变量 `SERVER_DEPLOY=true` 打开；服务器初始化、备案与切解析顺序见 [大陆托管与备案](docs/mainland-hosting.md)。备案号填 `_config.yml` 的 `beian` 段，留空时页脚不输出任何内容。
+
+### 线上定时体检
+
+`verify` 只证明「产物里该有的都有」，看不到线上真实的一面：响应头到底发出去没有、证书还剩几天、页面里的外链有没有烂掉。这三件事由 `.github/workflows/site-audit.yml` 每周一 09:00（北京时间，cron 写 UTC 的 `0 1 * * 1`）打一次线上站点：
+
+```bash
+node tools/audit-live.mjs            # 体检 https://blog.guangluo.top/
+node tools/audit-live.mjs --json     # 机器可读输出
+node tools/audit-live.mjs --base http://127.0.0.1:4001/   # 换目标（比如本地 hexo server）
+```
+
+- 页面清单取自线上 `sitemap.xml`，逐个断言 200；
+- 首页的 7 个安全响应头与 `scripts/cloudflare-headers.js` **逐字符比对**（脚本在 `node:vm` 沙箱里跑一遍这个构建期插件取期望值，工具里没有第二份 CSP 抄本，所以「改了源文件忘了部署」会被指出来）；
+- TLS 证书剩余有效期少于 14 天报警；
+- 页面外链死链检查：只有 `404` / `410` 算失败，`403` / `429` 这类「对方拦脚本客户端」只算告警。
+
+体检与发布互不依赖：它红了不会拦住发布，发布失败也不影响体检。判定规则、为什么 403/429 不算失败、后续扩展点见 [线上站点定时体检](docs/site-audit.md)。任务面板会自动停掉长期无活动的定时工作流，仓库有提交就不会触发。
 
 ## 常用修改位置
 
@@ -168,11 +244,17 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 | 公式 / 图表 / 时间线的验证页 | `source/examples/index.md` |
 | 订阅正文的相对资源路径与版权 | `templates/atom.xml` |
 | 响应式图片与变体生成 | `scripts/image-pipeline.js` |
+| 拍摄参数（手写部分） | `source/_data/photos.yml` |
+| 相册页文案与占位符 | `source/gallery/index.md` |
+| 站内自定义图标 | `source/_data/icons.yml` |
+| 站点地图的 URL 与图片/归档补全 | `templates/sitemap.xml`、`scripts/sitemap-extras.js` |
 | 安全响应头与缓存策略 | `scripts/cloudflare-headers.js` |
-| `h1` / `alt` 等无障碍修正 | `scripts/a11y.js` |
+| `h1` / `alt` / skip link 等无障碍修正 | `scripts/a11y.js` |
 | 图标文件生成 | `tools/make-favicon.mjs` |
 | 产物自检的硬约束 | `tools/check-site.mjs` |
 | 对比度 / 裂图 / CSP 实测 | `tools/browser-check.mjs` |
+| 线上体检的检查项与判定规则 | `tools/audit-live.mjs`、`docs/site-audit.md` |
+| 依赖更新的节奏与生态 | `.github/dependabot.yml` |
 
 ## 关于专栏与笔记本
 
@@ -223,10 +305,13 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 
 **主题的「非法克隆站 / 官方备用站」浮层已整体关掉**，见下文的 `scripts/canonical-notice.js`。`canonical.host` 仍必须填主站裸主机名，它决定页面的 `<link rel="canonical">`；`allowed_hosts` 目前只是记录（本站同时从 `blog.guangluo.top`、Cloudflare Pages 域名、裸域 / www 和大陆 ECS 的 IP 提供服务，逐个列出来便于日后恢复提示）。
 
-`scripts/seo-fixes.js` 修了两处主题行为，都是实测产物发现的：
+`scripts/seo-fixes.js` 修了三处主题行为，都是实测产物发现的：
 
-1. **结构化数据的图片是相对路径**。主题把作者的 `authorImage` 绝对化了，但文章 `image` 直接用 `postImages()` 的返回值，输出成 `/images/cover.jpg`。schema.org 要求绝对 URL，Google 富媒体测试会报错。插件用 canonical 的 origin 补齐。
-2. **文章没有封面时 `og:image` 用的是头像一个 1:1 的图**，而不是 `fallbacks.cover`。社交平台对 1200×630 的卡片更友好，因此无封面的文章改用默认封面。
+1. **结构化数据的图片是相对路径**。主题把作者的 `authorImage` 绝对化了，但文章 `image` 直接用 `postImages()` 的返回值，输出成 `/images/cover.jpg`。schema.org 要求绝对 URL，Google 富媒体测试会报错。插件用 canonical 的 origin 补齐（404 页没有 canonical，退回 `_config.yml` 的 `url`）。
+2. **没有封面的页面 `og:image` / `twitter:image` 用的是站点头像**。主题的兜底顺序是 `pageConfig.cover || 正文首图 || config.avatar`，所以首页、关于、订阅、404 这些页面在社交平台和 IM 里都是一张 280×280 的方头像。现在只要图片落在头像上就换成 `fallbacks.cover`（1200×630）；文章自己的封面和正文首图不受影响。
+3. **`twitter:card` 统一成 `summary_large_image`**。主题只在「文章 + 有封面」时才用大卡片，图片修好之后所有页面都有合格的大图，小卡片反而不合适。
+
+自检会守住结果：每页都要有绝对地址的 `og:image`、不能等于站点头像、`twitter:card` 必须是 `summary_large_image`。
 
 另外，主题默认的 `fallbacks.cover` / `link_card` 指向**主题作者 CDN 的占位图**（`gcore.jsdelivr.net/gh/cdn-x/placeholder`）。本站已把 `cover` 换成自己的图；`link_card` 未配置，因为站点目前没有用到链接卡片类标签。自检会检查页面里不再出现该 CDN。
 
@@ -266,7 +351,20 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 
 2026-10-17 复查：**别用脚本抓 Bing 搜索结果页来判断收录**。`https://www.bing.com/search?q=…` 对脚本客户端照样返回 200 和完整 HTML，但只有 `github`、`百度` 这类超热门查询给真实结果；`site:blog.guangluo.top`、`汉口江滩长曝光` 这类查询返回的是随机无关内容（同一个 `site:` 查询三次分别给出 Steam 论坛、DeepSeek 官网和漫画站），「结果数」也在 83 / 144,000 / 243,000 之间乱跳。补 Cookie 会话、`mkt=zh-CN&cc=CN`、`format=rss`、`cn.bing.com` 都试过，行为一致，属 Bing 对无浏览器会话客户端的降级响应。抓取侧则一切正常：用 bingbot 的 UA 请求首页、`sitemap.xml`、`atom.xml` 和文章页都是 200。所以 SERP 抓取只能说明「HTML 抓得到」，不能当作收录证据；要确认收录得登录 Bing Webmaster Tools 做 URL 检查，或填上 `seo.verification.bing` 后走官方 API。
 
-`templates/sitemap.xml` 覆盖了 hexo-generator-sitemap 的默认模板：默认模板会让首页出现两次（posts 循环一次、末尾又硬编码一次），IndexNow 会把同一条 URL 提交两遍，`tools/check-site.mjs` 现在会拦住重复 URL。2026-10-17 实测推送：`node tools/ping-search.mjs _config.domain.yml --strict` 向 `api.indexnow.org` 提交 8 条 URL，返回 200。
+`templates/sitemap.xml` 覆盖了 hexo-generator-sitemap 的默认模板：默认模板会让首页出现两次（posts 循环一次、末尾又硬编码一次），IndexNow 会把同一条 URL 提交两遍，`tools/check-site.mjs` 现在会拦住重复 URL。
+
+站点地图由两半拼起来（2026-10-17 扩写）：
+
+| 部分 | 位置 | 负责的内容 |
+| --- | --- | --- |
+| 模板 | `templates/sitemap.xml` | 文章、首页、标签、分类，以及 `xmlns:image` 命名空间 |
+| 构建期脚本 | `scripts/sitemap-extras.js` | 每篇文章的 `<image:image>`、`/posts/` 与 `/archives/`、年月归档 |
+
+为什么要分成两半：nunjucks 模板只能拿到 generator 传进去的 `posts` / `tags` / `categories`，而图片清单要从正文里现取、归档页根本不是 post 或 page，模板里都写不出来。脚本挂在 `after_generate` 上改写 `sitemap.xml` 这条路由，先查 `hexo.route.list()` 再决定收不收，所以不会出现「模板里写了、产物里没有」的 404 条目。自检会逐条校验 `<loc>` 与 `<image:loc>` 都能在产物里找到实体，并且**带图的文章必须有图片记录**。
+
+收录口径：收文章、首页、`/posts/`、`/archives/` 与年月归档、分类页、标签页、独立页面；**不收分页**（`/posts/page/2/`）——同一批文章在分页里重复出现，`page/1` 与 `/posts/` 还是同一份内容，收进来只浪费抓取配额。
+
+2026-10-17 实测推送：`node tools/ping-search.mjs _config.domain.yml --strict` 向 `api.indexnow.org` 提交站点地图里的 URL（条数随内容变化，别写死），返回 200。`<image:loc>` 不会被当成页面 URL 推给 IndexNow（`tools/ping-search.mjs` 用的是 cheerio 的 `loc` 选择器，`image:loc` 不在其中）。
 
 百度搜索资源平台暂不接入：域名未备案，提交收录意义不大。备案后再补 `baidu-site-verification` 验证 meta、「普通收录」推送和 `robots.txt` 里的 Baiduspider 分组（分组已保留，因为百度仍可能自己抓取）。
 
@@ -285,12 +383,16 @@ bun run seo:ping       # 推送 IndexNow
 | --- | --- |
 | `math-protect.js` / `mermaid-blocks.js` | 公式与图表的构建期处理（见上一节） |
 | `image-pipeline.js` | 生成图片变体、把 `<img>` 改写成 `<picture>`（见 [图片](#图片)） |
-| `a11y.js` | `h1` 归一、列表页补标题、图片补 `alt`（见 [无障碍](#无障碍)） |
+| `a11y.js` | `h1` 归一、列表页补标题、图片补 `alt`、viewport 去缩放锁、补 skip link（见 [无障碍](#无障碍)） |
 | `cloudflare-headers.js` | 生成 `_headers`（见 [响应头与缓存](#响应头与缓存)） |
 | `seo-fixes.js` / `seo-indexing.js` | 修正结构化数据与社交卡片；输出站长平台验证 meta 与 IndexNow 密钥文件 |
 | `beian.js` | 备案号页脚，留空时完全不输出 |
 | `canonical-notice.js` | 关掉主题的「非法克隆站 / 官方备用站」浮层 |
 | `lazy-images.js` | 给已经有真实 `src` 的图补原生 `loading` / `decoding` |
+| `photo-meta.js` | 文章末尾的拍摄参数卡片（手写 + EXIF） |
+| `gallery.js` | 相册页：扫全部文章的照片铺成网格 |
+| `photo-index.js` | 上面两个插件共用的「这篇文章有哪些照片」工具 |
+| `sitemap-extras.js` | 图片 sitemap 与 `/posts/`、归档页补进 `sitemap.xml`（见 [搜索引擎收录](#搜索引擎收录)） |
 
 `_config.stellar.yml` 的 `inject.head_end` 负责两件事：图标链接（`favicon.ico` 与 `apple-touch-icon.png`）和首页 Hero 的对比度修正。
 

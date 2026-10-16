@@ -52,7 +52,7 @@ function localTarget(value, base, context) {
 
 assert(existsSync(output), 'Run bun run build before checking the site.');
 for (const path of ['index.html', 'posts/index.html', 'about/index.html', 'subscribe/index.html', 'archives/index.html',
-  'categories/index.html', 'tags/index.html', 'examples/index.html',
+  'categories/index.html', 'tags/index.html', 'examples/index.html', 'gallery/index.html',
   '404.html', 'atom.xml', 'search.json', 'sitemap.xml', 'robots.txt',
   'favicon.ico', 'apple-touch-icon.png', '_headers']) {
   report(existsSync(resolve(output, path)), `Missing required page: ${path}`);
@@ -88,6 +88,29 @@ for (const file of pages) {
   }
   report($('main, [role="main"]').length === 1, `${path}: missing main landmark`);
   report(($('meta[name="viewport"]').attr('content') || '').includes('width=device-width'), `${path}: missing responsive viewport`);
+  // 缩放：`maximum-scale` / `user-scalable` 会禁掉双指缩放，WCAG 1.4.4 不达标。
+  // 主题把它写死在 head.ejs，由 scripts/a11y.js 在产物上去掉，这里守住结果。
+  const viewport = $('meta[name="viewport"]').attr('content') || '';
+  report(!/(?:maximum-scale|minimum-scale|user-scalable)/i.test(viewport),
+    `${path}: viewport blocks zooming: ${viewport}`);
+  // 键盘用户要能跳过顶栏和 Hero 直接到正文（WCAG 2.4.1）。目标 #main 必须带
+  // tabindex="-1"，否则部分浏览器只滚动、不移动焦点。
+  const skipLink = $('a.a11y-skip-link');
+  report(skipLink.length === 1, `${path}: expected exactly one skip link, found ${skipLink.length}`);
+  report(skipLink.attr('href') === '#main', `${path}: skip link must point at #main`);
+  report($('#main').attr('tabindex') === '-1', `${path}: skip link target #main needs tabindex="-1"`);
+  // skip link 本身也得是页面里第一个可聚焦元素，否则先按 Tab 还是落在顶栏上。
+  const focusable = $('body a[href], body button, body input, body select, body textarea, body [tabindex]');
+  report(focusable.length > 0 && focusable.first().is('a.a11y-skip-link'),
+    `${path}: skip link must be the first focusable element in <body>`);
+  // 社交卡片：图片不能被兜底成站点头像（1:1、280px），卡片类型要是大图卡片。
+  const ogImage = ($('meta[property="og:image"]').attr('content') || '').trim();
+  const avatar = new URL(config.avatar, site).href;
+  report(ogImage.length > 0, `${path}: missing og:image`);
+  report(/^https?:\/\//.test(ogImage), `${path}: og:image must be an absolute URL: ${ogImage}`);
+  report(ogImage !== avatar, `${path}: og:image falls back to the site avatar: ${ogImage}`);
+  report(($('meta[name="twitter:card"]').attr('content') || '') === 'summary_large_image',
+    `${path}: twitter:card should be summary_large_image`);
   // 无障碍：每页恰好一个 h1（scripts/a11y.js 负责把多出来的降级成 h2、
   // 给列表页补视觉隐藏的 h1），且每张图都必须有 alt 属性——alt="" 表示装饰性图片，
   // 与「完全没有 alt」在无障碍树里是两回事。
@@ -173,11 +196,35 @@ feed('entry').each((_, element) => {
   });
 });
 
-const sitemap = load(readFileSync(resolve(output, 'sitemap.xml'), 'utf8'), { xmlMode: true });
+const sitemapText = readFileSync(resolve(output, 'sitemap.xml'), 'utf8');
+const sitemap = load(sitemapText, { xmlMode: true });
 sitemap('loc').each((_, element) => localTarget(sitemap(element).text(), site, 'sitemap.xml'));
 const sitemapUrls = sitemap('loc').toArray().map(element => sitemap(element).text().trim());
 report(sitemapUrls.length > 0, 'sitemap.xml has no URLs');
 report(sitemapUrls.includes(site.href), 'sitemap.xml is missing the homepage');
+// 列表页与归档页由 scripts/sitemap-extras.js 在 after_generate 里补（模板的 posts
+// 循环扫不到它们）。这里是「收录口径」的硬约束：这两类入口必须收。
+report(sitemapText.includes('xmlns:image='),
+  'sitemap.xml is missing the image sitemap namespace (templates/sitemap.xml)');
+for (const path of ['posts/', 'archives/']) {
+  report(sitemapUrls.includes(new URL(path, site).href), `sitemap.xml is missing ${path}`);
+}
+// 图片 sitemap（Google 的 image 扩展）：每条都要能在产物里找到实体，
+// 而且带图的文章必须至少有一条图片记录——照片站的图片搜索入口。
+const sitemapImageUrls = [...sitemapText.matchAll(/<image:loc>([\s\S]*?)<\/image:loc>/g)]
+  .map(match => match[1].trim());
+for (const image of sitemapImageUrls) {
+  report(/^https?:\/\//.test(image), `sitemap.xml image is not absolute: ${image}`);
+  localTarget(image, site, 'sitemap.xml image');
+}
+for (const article of articles) {
+  const declared = (Array.isArray(article.image) ? article.image : [article.image])
+    .map(entry => (typeof entry === 'string' ? entry : entry && entry.url))
+    .filter(value => typeof value === 'string' && value.length > 0);
+  if (declared.length === 0) continue;
+  report(declared.some(image => sitemapImageUrls.includes(image)),
+    `Article missing from the image sitemap: ${article.headline}`);
+}
 // 重复 URL 会浪费抓取配额，IndexNow 也会把同一条提交两次；模板改动最容易在这里翻车。
 const duplicatedSitemapUrls = sitemapUrls.filter((url, index) => sitemapUrls.indexOf(url) !== index);
 report(duplicatedSitemapUrls.length === 0,
@@ -273,6 +320,8 @@ if (catchAll) {
   }
   // MathJax 的字形从 cdnjs 拉，font-src 漏了就是一堆豆腐块
   report(/font-src[^;]*cdnjs\.cloudflare\.com/.test(csp), '_headers: CSP font-src does not allow MathJax fonts');
+  // 相册页的 Fancybox 样式表来自 jsdelivr，style-src 漏了灯箱就是死的（点了没反应）
+  report(/style-src[^;]*gcore\.jsdelivr\.net/.test(csp), '_headers: CSP style-src does not allow the lightbox stylesheet');
 }
 for (const pattern of ['/*.css', '/*.js', '/*.jpg', '/*.webp', '/*.avif']) {
   report(headerBlocks.some(block => block.pattern === pattern && block.headers['cache-control']),
@@ -332,10 +381,64 @@ if (police) {
   report(homepage.html().includes(police), `Homepage is missing the police filing number: ${police}`);
 }
 
+// 拍摄参数（scripts/photo-meta.js）：`source/_data/photos.yml` 里手写的字段必须真的
+// 渲染到对应文章页上——写了不生效比不写更糟（作者会以为已经展示出去了）。
+// 键是文章 slug，产物路径里一定含 slug，用它定位页面，避免在这里再实现一遍 permalink 规则。
+const photosData = yaml.load(readFileSync('source/_data/photos.yml', 'utf8')) || {};
+for (const [slug, params] of Object.entries(photosData)) {
+  if (!params || typeof params !== 'object') continue;
+  const file = pages.find(candidate => relative(output, candidate).split(sep).join('/').includes(slug));
+  if (!file) {
+    errors.push(`source/_data/photos.yml: 找不到 ${slug} 对应的文章页`);
+    continue;
+  }
+  const $post = load(readFileSync(file, 'utf8'));
+  const card = $post('div.photo-meta');
+  report(card.length === 1, `${slug}: expected exactly one 拍摄参数 card, found ${card.length}`);
+  const text = card.text();
+  for (const [key, value] of Object.entries(params)) {
+    report(text.includes(String(value)), `${slug}: 拍摄参数 ${key} 没有渲染到页面上：${value}`);
+  }
+}
+
+// 相册页（scripts/gallery.js）：占位符必须被替换成真正的网格，而且每篇有图的文章
+// 都要在相册里出现——漏掉一篇比样式出错更难发现。
+const galleryHtml = readFileSync(resolve(output, 'gallery/index.html'), 'utf8');
+report(!galleryHtml.includes('<!-- gallery -->'), 'gallery/index.html still contains the gallery placeholder');
+report(galleryHtml.includes('tag-plugin gallery'), 'gallery/index.html is missing the gallery grid');
+// 逐条解码 href 的 pathname（不要整体 decodeHTML，正文里的 `100%` 之类会抛 URIError）
+const $gallery = load(galleryHtml);
+const galleryLinks = $gallery('a[href]').toArray().map(element => {
+  try {
+    return decodeURI(new URL($gallery(element).attr('href'), site).pathname);
+  } catch {
+    return '';
+  }
+});
+for (const article of articles) {
+  const declared = (Array.isArray(article.image) ? article.image : [article.image])
+    .filter(value => typeof value === 'string' && value.length > 0);
+  if (declared.length === 0) continue;
+  report(galleryLinks.includes(decodeURI(new URL(article.url).pathname)),
+    `Article missing from the gallery: ${article.headline}`);
+}
+
+// 站内自定义图标（source/_data/icons.yml）：顶栏用了 default:camera，图标集里没有
+// 对应条目时主题只会渲染一个空 svg，页面照常通过——这里守住它真的被合并进去了。
+const dirIconKeys = ['default:camera'];
+const iconSetsPath = resolve(output, 'js/icons/default.json');
+if (existsSync(iconSetsPath)) {
+  const iconSets = JSON.parse(readFileSync(iconSetsPath, 'utf8'));
+  for (const key of dirIconKeys) {
+    report(Boolean(iconSets.default && iconSets.default[key]),
+      `js/icons/default.json is missing ${key}（检查 source/_data/icons.yml）`);
+  }
+}
+
 // README 与文档之间用相对路径互相引用。这些链接不参与站点构建，所以断了也没人会发现；
 // 2026-10-17 就出现过 docs/ 整个目录从工作区消失、而所有检查照常通过的情况。
 // 这里把「仓库内的文档链接」也纳入自检。
-for (const doc of ['README.md', 'docs/domain-deployment.md', 'docs/mainland-hosting.md']) {
+for (const doc of ['README.md', 'docs/domain-deployment.md', 'docs/mainland-hosting.md', 'docs/site-audit.md']) {
   if (!existsSync(doc)) {
     errors.push(`Missing documentation file: ${doc}`);
     continue;

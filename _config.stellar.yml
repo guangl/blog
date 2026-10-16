@@ -14,6 +14,10 @@ topbar:
       icon: default:documents
       title: 文章
       url: /posts/
+    - id: gallery
+      icon: default:camera
+      title: 相册
+      url: /gallery/
     - id: archives
       icon: default:calendar
       title: 归档
@@ -149,6 +153,7 @@ footer:
     - title: 阅读
       items:
         - "[所有文章](/posts/)"
+        - "[相册](/gallery/)"
         - "[归档](/archives/)"
     - title: 检索
       items:

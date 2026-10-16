@@ -24,15 +24,32 @@
  *    规则：卡片封面用同一张卡片里的文章标题；背景类（class 含 bg）与拿不到
  *    标题的，一律 alt=""（装饰性）。
  *
- * `tools/check-site.mjs` 会检查这三条不被改回去（每页恰好一个 h1、图片都有 alt）。
+ * 4. **viewport 去掉 maximum-scale**。主题在 head.ejs 里写死了
+ *    `width=device-width, initial-scale=1, maximum-scale=1`，没有配置项。
+ *    `maximum-scale=1` 会禁掉双指缩放（Android Chrome 直接生效，iOS Safari 10+
+ *    虽然忽略它，但其它浏览器不一定），WCAG 1.4.4「调整文字大小」不达标，
+ *    低视力读者没法放大看照片参数。这里把 `maximum-scale` / `minimum-scale` /
+ *    `user-scalable` 一律删掉，其余 token 原样保留。
+ *
+ * 5. **补「跳到主要内容」链接**。主题不提供 skip link，键盘用户每次都要先走过
+ *    顶栏和 Hero 的四个按钮才能到正文（WCAG 2.4.1「绕过区块」）。这里在 <body>
+ *    之后插入页面里第一个可聚焦元素，指向 <main id="main">，并给 main 加
+ *    `tabindex="-1"`——不加的话部分浏览器只滚动不移动焦点，Vim 式阅读和
+ *    屏幕阅读器仍停在原地。样式用「离屏直到聚焦」，不做 display:none。
+ *
+ * `tools/check-site.mjs` 会检查这些不被改回去（每页恰好一个 h1、图片都有 alt、
+ * viewport 不含 maximum-scale、每页都有 skip link 指向 #main）。
  */
 
 "use strict";
 
 const VISUALLY_HIDDEN = "a11y-visually-hidden";
+const SKIP_LINK = "a11y-skip-link";
 
-const VISUALLY_HIDDEN_CSS = `<style>
+const A11Y_CSS = `<style>
 .${VISUALLY_HIDDEN}{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+.${SKIP_LINK}{position:absolute;top:-4em;left:0;z-index:100;padding:.6em 1em;background:#fff;color:#111;font-weight:600;text-decoration:none;border-radius:0 0 .4em 0;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.${SKIP_LINK}:focus{top:0}
 </style>`;
 
 function escapeHtml(value) {
@@ -96,8 +113,48 @@ function ensurePageHeading(html, path) {
   const main = /<main\b[^>]*>/i.exec(html);
   if (!main) return html;
   const injected = `<h1 class="${VISUALLY_HIDDEN}">${escapeHtml(heading)}</h1>`;
-  const withHeading = html.replace(main[0], `${main[0]}${injected}`);
-  return withHeading.replace("</head>", `${VISUALLY_HIDDEN_CSS}</head>`);
+  return html.replace(main[0], `${main[0]}${injected}`);
+}
+
+/**
+ * 去掉阻止缩放的 viewport token。主题把它写死在 head.ejs 里，没有配置项，
+ * 只能在产物上改。只删这三个 token，`width` / `initial-scale` 原样保留。
+ */
+function normalizeViewport(html) {
+  if (!/maximum-scale|minimum-scale|user-scalable/i.test(html)) return html;
+  return html.replace(/(<meta\s+name="viewport"\s+content=")([^"]*)(")/i, (whole, head, content, tail) => {
+    const kept = content
+      .split(",")
+      .map(token => token.trim())
+      .filter(Boolean)
+      .filter(token => !/^(?:maximum-scale|minimum-scale|user-scalable)\s*=/i.test(token));
+    return head + kept.join(", ") + tail;
+  });
+}
+
+/**
+ * 插入 skip link，并让目标 <main> 可以被程序化聚焦。
+ * 只有在页面确实有 id="main" 的 main 地标时才插，避免做出一个点了不动的链接。
+ */
+function ensureSkipLink(html) {
+  if (html.includes(`class="${SKIP_LINK}"`)) return html;
+  const body = /<body\b[^>]*>/i.exec(html);
+  if (!body) return html;
+  const main = /<main\b[^>]*\bid="main"[^>]*>/i.exec(html);
+  if (!main) return html;
+  const link = `<a class="${SKIP_LINK}" href="#main">跳到主要内容</a>`;
+  let out = html.replace(body[0], `${body[0]}${link}`);
+  // 目标元素要能接收焦点：多数浏览器点击 fragment 只滚动，焦点仍留在链接上。
+  out = out.replace(main[0], /tabindex=/i.test(main[0])
+    ? main[0]
+    : main[0].replace(/<main\b/i, '<main tabindex="-1"'));
+  return out;
+}
+
+/** 无障碍样式只注入一次，位置固定在 </head> 之前。 */
+function injectStyles(html) {
+  if (!html.includes("</head>") || html.includes(`.${SKIP_LINK}{`)) return html;
+  return html.replace("</head>", `${A11Y_CSS}</head>`);
 }
 
 /**
@@ -127,8 +184,10 @@ function ensureImageAlt(html) {
 
 hexo.extend.filter.register("after_render:html", (html, data) => {
   if (typeof html !== "string" || !html.includes("</head>")) return html;
-  let out = demoteExtraHeadings(html);
+  let out = normalizeViewport(html);
+  out = demoteExtraHeadings(out);
   out = ensureImageAlt(out);
   out = ensurePageHeading(out, outputPath(html, data));
-  return out;
+  out = ensureSkipLink(out);
+  return injectStyles(out);
 }, 6);
