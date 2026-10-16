@@ -177,6 +177,13 @@ server {
 
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # 下面这几条要和 Cloudflare Pages 那条通道保持一致：Nginx 不认 _headers 文件，
+    # 值由 scripts/cloudflare-headers.js 生成，这里的字符串必须逐字符相同
+    # （tools/check-site.mjs 会比对两处，改一处忘了另一处就构建失败）。
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://gcore.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data: https://cdnjs.cloudflare.com; media-src 'self'; frame-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
 
     gzip on;
     gzip_vary on;
