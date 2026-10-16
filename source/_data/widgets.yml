@@ -1,0 +1,19 @@
+welcome:
+  layout: markdown
+  title: 欢迎来访
+  content: |
+    这里是 Guang Luo 的个人博客。
+
+    管理数据库，记录经验，偶尔带着相机出门。
+
+    [关于本站](/blog/about/) · [订阅更新](/blog/subscribe/)
+
+recent:
+  limit: 5
+  rss: /blog/atom.xml
+
+tagcloud:
+  title: 按标签探索
+  min_font: 14
+  max_font: 18
+  show_count: true

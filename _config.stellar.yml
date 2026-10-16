@@ -1,0 +1,103 @@
+# 仅覆盖站点使用的选项，主题本身由 Bun 管理。
+logo:
+  avatar: "[/blog/images/avatar.svg](/about/)"
+  title: "[guangluo's blog](/blog/)"
+  subtitle: "数据库 · 运维 · 生活"
+
+menubar:
+  items:
+    - id: post
+      icon: default:documents
+      title: 文章
+      url: /
+    - id: archives
+      icon: default:calendar
+      title: 归档
+      url: /archives/
+    - id: about
+      icon: default:shield-user
+      title: 关于
+      url: /about/
+    - id: subscribe
+      icon: default:rss
+      title: 订阅
+      url: /subscribe/
+
+site_tree:
+  home:
+    leftbar: welcome, recent, tagcloud
+  index_blog:
+    leftbar: welcome, recent, tagcloud
+  post:
+    leftbar: welcome, recent
+    rightbar: toc
+  page:
+    leftbar: welcome, recent
+    rightbar: toc
+
+article:
+  card_style: classic
+  card_tags: true
+  reading_time: true
+  share: [link, email]
+  license: "本文采用 [CC BY 4.0 署名国际许可协议](https://creativecommons.org/licenses/by/4.0/)。转载或改编时请注明作者 Guang Luo，并附上原文和许可证链接。"
+
+search:
+  service: local_search
+  local_search:
+    field: all
+    path: /search.json
+    content: true
+    cache_ttl: 3600
+
+structured_data:
+  links:
+    - https://github.com/guangl
+
+footer:
+  social:
+    github:
+      icon: default:github
+      title: GitHub
+      url: https://github.com/guangl
+    rss:
+      icon: default:rss
+      title: Atom 订阅
+      url: /atom.xml
+  sitemap:
+    - title: 阅读
+      items:
+        - "[所有文章](/)"
+        - "[分类](/categories/)"
+        - "[标签](/tags/)"
+        - "[归档](/archives/)"
+    - title: 本站
+      items:
+        - "[关于博客](/about/)"
+        - "[订阅更新](/subscribe/)"
+        - "[GitHub](https://github.com/guangl)"
+        - "[站点地图](/sitemap.xml)"
+  content: |
+    © 2026 [{author.name}](/blog/about/)。文章与图片采用 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可协议，另有声明的内容除外。
+    使用 [Hexo](https://hexo.io/) 与 [{theme.name}]({theme.tree}) 构建。
+
+plugins:
+  copycode:
+    default_text: 复制
+    success_text: 已复制
+  scrollreveal:
+    enable: false
+  preload:
+    enable: false
+
+style:
+  prefers_theme: auto
+  color:
+    theme: "#237a75"
+    accent: "#b8753d"
+    link: "#237a75"
+  animated_avatar:
+    animate: false
+  leftbar:
+    background-image: none
+  error_page: /blog/images/404.svg

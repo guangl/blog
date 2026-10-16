@@ -21,11 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取完整历史，hexo 用 updated 时间时需要
+          fetch-depth: 1
 
       - uses: oven-sh/setup-bun@v2
         with:
-          version: latest
+          bun-version: '1.4.3'
 
       - uses: actions/setup-node@v4
         with:
@@ -36,6 +36,9 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      - name: Check generated site
+        run: bun run check
 
       - uses: actions/configure-pages@v5
 

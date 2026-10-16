@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200" role="img" aria-label="404 页面未找到">
+  <rect x="40" y="20" width="400" height="160" rx="32" fill="#237a75" fill-opacity=".09"/>
+  <text x="240" y="137" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="112" fill="#237a75">404</text>
+  <circle cx="392" cy="44" r="10" fill="#b8753d"/>
+</svg>

@@ -4,6 +4,9 @@ db.json
 *.log
 node_modules/
 public/
+public-domain/
+.wrangler/
+source/_data/caches/
 .deploy*/
 _multiconfig.yml
 # .planning is intentionally tracked for GSD workflow

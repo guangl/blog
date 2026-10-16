@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="{{ config.language }}">
+  <title>{{ config.title }}</title>
+  <subtitle>{{ config.subtitle }}</subtitle>
+  <link href="{{ feed_url | uriencode }}" rel="self" type="application/atom+xml"/>
+  <link href="{{ url | uriencode }}" rel="alternate"/>
+  <id>{{ url | uriencode }}</id>
+  <updated>{{ posts.first().updated.toISOString() }}</updated>
+  <author><name>{{ config.author }}</name></author>
+  <rights>CC BY 4.0 · {{ config.author }} · https://creativecommons.org/licenses/by/4.0/</rights>
+  <generator uri="https://hexo.io/">Hexo</generator>
+  {% for post in posts.toArray() %}
+  <entry xml:base="{{ post.permalink | uriencode }}">
+    <title>{{ post.title }}</title>
+    <link href="{{ post.permalink | uriencode }}" rel="alternate"/>
+    <id>{{ post.permalink | uriencode }}</id>
+    <published>{{ post.date.toISOString() }}</published>
+    <updated>{{ post.updated.toISOString() }}</updated>
+    <summary>{{ post.description or post.title }}</summary>
+    {% if config.feed.content and post.content %}
+    <content type="html"><![CDATA[{{ post.content | noControlChars | safe }}]]></content>
+    {% endif %}
+    {% for category in post.categories.toArray() %}
+    <category term="{{ category.name }}" scheme="{{ category.permalink | uriencode }}"/>
+    {% endfor %}
+    {% for tag in post.tags.toArray() %}
+    <category term="{{ tag.name }}" scheme="{{ tag.permalink | uriencode }}"/>
+    {% endfor %}
+  </entry>
+  {% endfor %}
+</feed>

@@ -1,0 +1,53 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-pages-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: cloudflare-pages
+      url: https://blog.guangluo.top
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.3'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build and check custom-domain site
+        run: bun run verify:domain
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: aba21ab1a8a52599cfe3a66ec45501fe
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo '::error::Add the CLOUDFLARE_API_TOKEN repository secret with Account > Cloudflare Pages > Edit permission.'
+            exit 1
+          fi
+          bunx wrangler@4.151.0 pages deploy public-domain \
+            --project-name guangluo-blog \
+            --branch main \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-dirty=false
