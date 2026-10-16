@@ -253,6 +253,13 @@ const AUDIT = `(() => {
       x: box.x, y: box.y, width: box.width, height: box.height
     };
   }).filter(item => item.width > 1 && item.height > 1);
+  // 只量首屏内的元素。后面截的是视口截图，坐标落在视口外就会被钳到边缘，
+  // 量到的其实是照片底部那一行像素，会得出「黑字压在照片上、对比度不足」的假结论——
+  // 2026-10-17 首页的面包屑「主页」和「更新于」就是这么被误报的：它们本来在首屏之下、
+  // 压的是页面底色。压在照片上的文字必然在首屏内（Hero / banner 都在顶部），跳过不会漏。
+  const inViewport = item => item.y < window.innerHeight && item.y + item.height > 0;
+  const skipped = heroTexts.filter(item => !inViewport(item)).length;
+  const visibleHeroTexts = heroTexts.filter(inViewport);
   const title = document.querySelector('.bottom.only-title .title');
   return {
     lang: document.documentElement.lang,
@@ -272,7 +279,8 @@ const AUDIT = `(() => {
       .map(script => script.src)
       .filter(src => src && !src.startsWith(location.origin))
       .map(src => new URL(src).origin),
-    heroTexts,
+    heroTexts: visibleHeroTexts,
+    heroTextsSkipped: skipped,
     pageTitleFontSize: title ? getComputedStyle(title).fontSize : null,
     pageTitleTag: title ? title.tagName : null
   };
@@ -439,6 +447,11 @@ async function main() {
           const shown = text ? `rgb(${text.rgb.map(value => Math.round(value)).join(",")})` : "?";
           console.log(`    ${ratio === null ? "?" : ratio.toFixed(2)}:1  需 ${required}:1  ${verdict}  ${item.fontSize}px/${item.fontWeight}  ${shown}  ${item.label}`);
         }
+        if (audit.heroTextsSkipped > 0) {
+          console.log(`    （另有 ${audit.heroTextsSkipped} 处候选文字在首屏之外，未测量：它们压的是页面底色，不是照片）`);
+        }
+      } else {
+        console.log("  压在照片上的文字对比度：首屏内没有候选元素，跳过");
       }
 
       const blocking = [...new Set([...problems, ...violations.result.value])];

@@ -88,6 +88,29 @@ for (const file of pages) {
   }
   report($('main, [role="main"]').length === 1, `${path}: missing main landmark`);
   report(($('meta[name="viewport"]').attr('content') || '').includes('width=device-width'), `${path}: missing responsive viewport`);
+  // 缩放：`maximum-scale` / `user-scalable` 会禁掉双指缩放，WCAG 1.4.4 不达标。
+  // 主题把它写死在 head.ejs，由 scripts/a11y.js 在产物上去掉，这里守住结果。
+  const viewport = $('meta[name="viewport"]').attr('content') || '';
+  report(!/(?:maximum-scale|minimum-scale|user-scalable)/i.test(viewport),
+    `${path}: viewport blocks zooming: ${viewport}`);
+  // 键盘用户要能跳过顶栏和 Hero 直接到正文（WCAG 2.4.1）。目标 #main 必须带
+  // tabindex="-1"，否则部分浏览器只滚动、不移动焦点。
+  const skipLink = $('a.a11y-skip-link');
+  report(skipLink.length === 1, `${path}: expected exactly one skip link, found ${skipLink.length}`);
+  report(skipLink.attr('href') === '#main', `${path}: skip link must point at #main`);
+  report($('#main').attr('tabindex') === '-1', `${path}: skip link target #main needs tabindex="-1"`);
+  // skip link 本身也得是页面里第一个可聚焦元素，否则先按 Tab 还是落在顶栏上。
+  const focusable = $('body a[href], body button, body input, body select, body textarea, body [tabindex]');
+  report(focusable.length > 0 && focusable.first().is('a.a11y-skip-link'),
+    `${path}: skip link must be the first focusable element in <body>`);
+  // 社交卡片：图片不能被兜底成站点头像（1:1、280px），卡片类型要是大图卡片。
+  const ogImage = ($('meta[property="og:image"]').attr('content') || '').trim();
+  const avatar = new URL(config.avatar, site).href;
+  report(ogImage.length > 0, `${path}: missing og:image`);
+  report(/^https?:\/\//.test(ogImage), `${path}: og:image must be an absolute URL: ${ogImage}`);
+  report(ogImage !== avatar, `${path}: og:image falls back to the site avatar: ${ogImage}`);
+  report(($('meta[name="twitter:card"]').attr('content') || '') === 'summary_large_image',
+    `${path}: twitter:card should be summary_large_image`);
   // 无障碍：每页恰好一个 h1（scripts/a11y.js 负责把多出来的降级成 h2、
   // 给列表页补视觉隐藏的 h1），且每张图都必须有 alt 属性——alt="" 表示装饰性图片，
   // 与「完全没有 alt」在无障碍树里是两回事。
