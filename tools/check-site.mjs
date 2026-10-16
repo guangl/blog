@@ -210,6 +210,20 @@ if (indexnowKey) {
   }
 }
 
+// 备案信息：填了就必须出现在页脚，而且 ICP 备案号必须链到工信部备案系统
+// （大陆访问上线前的硬性要求）。留空时这里什么都不检查、页面也不输出。
+const beian = config.beian || {};
+const icp = (beian.icp || '').trim();
+if (icp) {
+  report(homepage.html().includes(icp), `Homepage is missing the ICP filing number: ${icp}`);
+  report(homepage('a[href^="https://beian.miit.gov.cn"]').length > 0,
+    'The ICP filing number must link to https://beian.miit.gov.cn');
+}
+const police = (beian.police || '').trim();
+if (police) {
+  report(homepage.html().includes(police), `Homepage is missing the police filing number: ${police}`);
+}
+
 if (errors.length) {
   console.error(errors.join('\n'));
   process.exitCode = 1;
