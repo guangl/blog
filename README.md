@@ -204,4 +204,4 @@ bun run seo:ping       # 推送 IndexNow
 
 ## 许可证
 
-文章、图片和配置文件均以 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可发布，详情见 [LICENSE](LICENSE)。转载或改编时请注明作者 Guang Luo，并附上许可证链接。
+文章、图片和配置文件均以 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可发布，详情见 [LICENSE](LICENSE)。转载或改编时请注明作者罗广，并附上许可证链接。
