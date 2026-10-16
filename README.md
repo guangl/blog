@@ -140,7 +140,7 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 | 作者外部资料 | `structured_data.same_as` | 进入 JSON-LD 的 `sameAs` |
 | 默认封面 | `fallbacks.cover` | `source/images/cover.jpg`，1200×630 |
 
-**`allowed_hosts` 必须包含 `guangluo-blog.pages.dev`**。主题会用 base64 编码的 `canonical.host` 与当前 `location.hostname` 比对，不在名单里的主机会弹出「非法克隆站」提示。Cloudflare Pages 的默认域名是本站的合法入口，漏掉它会让从该域名访问的读者看到警告，搜索引擎也可能把重复地址单独收录。（`localhost` 被主题硬编码跳过。）
+**主题的「非法克隆站 / 官方备用站」浮层已整体关掉**，见下文的 `scripts/canonical-notice.js`。`canonical.host` 仍必须填主站裸主机名，它决定页面的 `<link rel="canonical">`；`allowed_hosts` 目前只是记录（本站同时从 `blog.guangluo.top`、Cloudflare Pages 域名、裸域 / www 和大陆 ECS 的 IP 提供服务，逐个列出来便于日后恢复提示）。
 
 `scripts/seo-fixes.js` 修了两处主题行为，都是实测产物发现的：
 
@@ -148,6 +148,10 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 2. **文章没有封面时 `og:image` 用的是头像一个 1:1 的图**，而不是 `fallbacks.cover`。社交平台对 1200×630 的卡片更友好，因此无封面的文章改用默认封面。
 
 另外，主题默认的 `fallbacks.cover` / `link_card` 指向**主题作者 CDN 的占位图**（`gcore.jsdelivr.net/gh/cdn-x/placeholder`）。本站已把 `cover` 换成自己的图；`link_card` 未配置，因为站点目前没有用到链接卡片类标签。自检会检查页面里不再出现该 CDN。
+
+`scripts/canonical-notice.js` **关掉了主题的「非法克隆站 / 官方备用站」浮层**。主题的 `canonicalCheck` 在「当前主机 ≠ 主站主机」时会盖一层浮层：主机在 `allowed_hosts` 里就提示「本站为官方备用站，仅供应急」，否则提示「本站为非法克隆站」，两种情况都会顺手往 `<head>` 插一个 `noindex, nofollow`。本站有 5 个入口（主站、Pages 域名、裸域、www、大陆 IP），那层提示在任何备用入口都会出现，因此整体关闭。
+
+主题没有开关，而判定要求「当前主机 == canonical 主机」才静默，纯静态配置做不到，所以改用构建期注入：在主题 `main.js`（defer）执行**之前**清掉客户端判定数据里的 `host` / `encoded`，`canonicalCheck` 的第一行 `if (!getOriginalHost()) return` 就直接返回。页面里的 `<link rel="canonical">` 仍指向主站，不受影响。自检会要求每个页面都带上那段内联脚本；**想恢复提示就删掉这个文件**。
 
 ### 抓取策略（robots.txt）
 

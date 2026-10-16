@@ -71,6 +71,9 @@ for (const file of pages) {
   report(!unescapeHTML(raw).includes('https://guangl.github.io/blog'), `${path}: stale GitHub Pages URL`);
   report(Boolean($('title').text().trim()), `${path}: missing title`);
   report(Boolean($('meta[name="description"]').attr('content')), `${path}: missing description`);
+  // scripts/canonical-notice.js 关掉了主题的「非法克隆站 / 官方备用站」浮层，
+  // 每个页面都必须带上那段内联脚本，否则备用入口上又会弹出提示并插 noindex。
+  report(raw.includes('data-stellar-no-canonical-tip'), `${path}: missing the canonical-notice opt-out script`);
   if (path === 'index.html') {
     report(Boolean(homeHeadline) && $('.wiki-hero h1').text().trim() === homeHeadline,
       'Native homepage hero is missing or does not show the configured headline');
