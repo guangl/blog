@@ -29,10 +29,11 @@
 
 const { encodeURL } = require("hexo-util");
 
+const { contentImagePaths, coverPath, routeExists } = require("./photo-index");
+
 const IMAGE_NAMESPACE = "http://www.google.com/schemas/sitemap-image/1.1";
 
 const LOC_PATTERN = /<loc>([\s\S]*?)<\/loc>/g;
-const IMG_SRC_PATTERN = /<img\b[^>]*\bsrc="([^"]+)"/gi;
 
 function readRoute(path) {
   return new Promise((resolve, reject) => {
@@ -66,38 +67,17 @@ function escapeXml(value) {
     .replace(/"/g, "&quot;");
 }
 
-/** 路由清单：`sitemap.xml` 里的每条 URL 与图片都要在这里能找到实体。 */
-function routeSet() {
-  const routes = new Set(hexo.route.list());
-  return {
-    has: (pathname) => {
-      const clean = pathname.replace(/^\/+/, "");
-      if (clean === "") return routes.has("index.html");
-      // 路由里的中文路径是裸 UTF-8，而 URL 里的 pathname 已经被百分号编码，
-      // 两种写法都要试（文章 slug 默认取标题，中文标题很常见）。
-      const candidates = [clean];
-      try {
-        candidates.push(decodeURIComponent(clean));
-      } catch {
-        // 非法转义序列：只用原样形式
-      }
-      return candidates.some(candidate =>
-        routes.has(candidate) || routes.has(candidate.replace(/\/$/, "") + "/index.html"));
-    }
-  };
-}
-
 /**
  * 列表页与归档页：直接从路由里捞，产物有才收。
  * 这样 hexo-generator-archive 的目录结构变了也不会漏，不用在这里维护路径规则。
  * URL 一律走 encodeURL，与模板里的 `| uriencode` 保持一致（否则中文路径对不上）。
  */
-function listingUrls(site, routes) {
+function listingUrls(hexo, site) {
   const urls = [];
   const push = (url) => {
     if (!urls.includes(url)) urls.push(url);
   };
-  if (routes.has("posts/")) push(encodeURL(new URL("posts/", site).href));
+  if (routeExists(hexo, "posts/")) push(encodeURL(new URL("posts/", site).href));
   for (const route of hexo.route.list()) {
     if (/^archives\/(?:\d{4}\/)?(?:\d{2}\/)?index\.html$/.test(route)) {
       push(encodeURL(new URL(route.replace(/index\.html$/, ""), site).href));
@@ -106,28 +86,20 @@ function listingUrls(site, routes) {
   return urls.sort();
 }
 
-/** 一篇文章的图片：封面在前，正文图按出现顺序，去重、只留本站、只留真实存在的。 */
-function postImages(post, site, routes) {
+/**
+ * 一篇文章的图片（绝对 URL）：封面在前，正文图按出现顺序，去重、只留产物里真有的。
+ * 解析正文 src、判定本站/外链的逻辑在 scripts/photo-index.js 里，与相册页共用一份。
+ */
+function postImages(hexo, post, site) {
   const origin = new URL(site).origin;
   const found = [];
-  const push = (value) => {
-    if (typeof value !== "string" || value.length === 0) return;
-    let url;
-    try {
-      url = new URL(decodeEntities(value), post.permalink);
-    } catch {
-      return;
-    }
-    // 图片 sitemap 只报本站的图；外链图（图床等）不该出现在这里。
-    if (url.origin !== origin) return;
-    url.hash = "";
-    if (!routes.has(url.pathname)) return;
-    if (!found.includes(url.href)) found.push(url.href);
+  const push = (pathname) => {
+    if (!pathname || !routeExists(hexo, pathname)) return;
+    const href = origin + encodeURL(pathname);
+    if (!found.includes(href)) found.push(href);
   };
-  push(post.cover);
-  let match;
-  const pattern = new RegExp(IMG_SRC_PATTERN.source, "gi");
-  while ((match = pattern.exec(post.content || "")) !== null) push(match[1]);
+  push(coverPath(post));
+  for (const pathname of contentImagePaths(post)) push(pathname);
   return found;
 }
 
@@ -144,7 +116,7 @@ function renderImage(image, title) {
  * 把 `<image:image>` 插进对应的 `<url>` 块。
  * 模板已经按 post/permalink 输出过 `<url>`，这里只做插入，不重排。
  */
-function attachImages(xml, imagesByUrl, site) {
+function attachImages(xml, imagesByUrl) {
   return xml.replace(/[ \t]*<url>[\s\S]*?<\/url>/g, (block) => {
     const loc = /<loc>([\s\S]*?)<\/loc>/.exec(block);
     if (!loc) return block;
@@ -180,7 +152,6 @@ hexo.extend.filter.register("after_generate", async () => {
   if (!xml.includes("<urlset")) return;
 
   const site = hexo.config.url;
-  const routes = routeSet();
   const existing = new Set();
   let match;
   const locPattern = new RegExp(LOC_PATTERN.source, "g");
@@ -188,12 +159,10 @@ hexo.extend.filter.register("after_generate", async () => {
 
   // 文章图片：按 permalink 归组，等下插到同一条 <url> 里
   const imagesByUrl = new Map();
-  let withImages = 0;
   for (const post of hexo.locals.get("posts").toArray()) {
-    const images = postImages(post, site, routes);
+    const images = postImages(hexo, post, site);
     if (images.length === 0) continue;
     imagesByUrl.set(encodeURL(new URL(post.permalink).href), images);
-    withImages += 1;
   }
 
   let next = xml;
@@ -201,11 +170,11 @@ hexo.extend.filter.register("after_generate", async () => {
     if (!next.includes("xmlns:image=")) {
       next = next.replace("<urlset ", `<urlset xmlns:image="${IMAGE_NAMESPACE}" `);
     }
-    next = attachImages(next, imagesByUrl, site);
+    next = attachImages(next, imagesByUrl);
   }
 
   // 列表页与归档页：模板扫不到，这里补在末尾，并跳过模板已经输出过的地址
-  const extras = listingUrls(site, routes).filter(url => !existing.has(url));
+  const extras = listingUrls(hexo, site).filter(url => !existing.has(url));
   if (extras.length > 0) next = insertBeforeClose(next, extras.map(extraEntry).join("\n"));
 
   hexo.route.set("sitemap.xml", next);

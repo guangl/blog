@@ -1,0 +1,8 @@
+# 站内自定义图标。主题的图标集在 node_modules/hexo-theme-stellar/_data/icons.yml，
+# 这里的同名键会覆盖它，新键则追加（构建期合并成 stellar.data.icons）。
+#
+# 用法：任何接受 `icon:` 的地方写 `default:camera`（见 _config.stellar.yml 的顶栏菜单）。
+# 主题自带的 34 个图标里没有相机 / 图片，所以这里补一个：自己画的描边相机，
+# 线条粗细与风格对齐主题里那枚 `default:search`（stroke-width 1.5、currentColor），
+# 不引入第三方图标集的 path 数据。
+default:camera: <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5A2.5 2.5 0 0 1 5.5 7h1.7c.5 0 .96-.27 1.22-.7l.66-1.1c.26-.43.72-.7 1.22-.7h3.4c.5 0 .96.27 1.22.7l.66 1.1c.26.43.72.7 1.22.7h1.7A2.5 2.5 0 0 1 21 9.5v7A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"/><circle cx="12" cy="13" r="3.5"/></g></svg>

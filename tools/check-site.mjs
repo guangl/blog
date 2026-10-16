@@ -52,7 +52,7 @@ function localTarget(value, base, context) {
 
 assert(existsSync(output), 'Run bun run build before checking the site.');
 for (const path of ['index.html', 'posts/index.html', 'about/index.html', 'subscribe/index.html', 'archives/index.html',
-  'categories/index.html', 'tags/index.html', 'examples/index.html',
+  'categories/index.html', 'tags/index.html', 'examples/index.html', 'gallery/index.html',
   '404.html', 'atom.xml', 'search.json', 'sitemap.xml', 'robots.txt',
   'favicon.ico', 'apple-touch-icon.png', '_headers']) {
   report(existsSync(resolve(output, path)), `Missing required page: ${path}`);
@@ -320,6 +320,8 @@ if (catchAll) {
   }
   // MathJax 的字形从 cdnjs 拉，font-src 漏了就是一堆豆腐块
   report(/font-src[^;]*cdnjs\.cloudflare\.com/.test(csp), '_headers: CSP font-src does not allow MathJax fonts');
+  // 相册页的 Fancybox 样式表来自 jsdelivr，style-src 漏了灯箱就是死的（点了没反应）
+  report(/style-src[^;]*gcore\.jsdelivr\.net/.test(csp), '_headers: CSP style-src does not allow the lightbox stylesheet');
 }
 for (const pattern of ['/*.css', '/*.js', '/*.jpg', '/*.webp', '/*.avif']) {
   report(headerBlocks.some(block => block.pattern === pattern && block.headers['cache-control']),
@@ -377,6 +379,60 @@ if (icp) {
 const police = (beian.police || '').trim();
 if (police) {
   report(homepage.html().includes(police), `Homepage is missing the police filing number: ${police}`);
+}
+
+// 拍摄参数（scripts/photo-meta.js）：`source/_data/photos.yml` 里手写的字段必须真的
+// 渲染到对应文章页上——写了不生效比不写更糟（作者会以为已经展示出去了）。
+// 键是文章 slug，产物路径里一定含 slug，用它定位页面，避免在这里再实现一遍 permalink 规则。
+const photosData = yaml.load(readFileSync('source/_data/photos.yml', 'utf8')) || {};
+for (const [slug, params] of Object.entries(photosData)) {
+  if (!params || typeof params !== 'object') continue;
+  const file = pages.find(candidate => relative(output, candidate).split(sep).join('/').includes(slug));
+  if (!file) {
+    errors.push(`source/_data/photos.yml: 找不到 ${slug} 对应的文章页`);
+    continue;
+  }
+  const $post = load(readFileSync(file, 'utf8'));
+  const card = $post('div.photo-meta');
+  report(card.length === 1, `${slug}: expected exactly one 拍摄参数 card, found ${card.length}`);
+  const text = card.text();
+  for (const [key, value] of Object.entries(params)) {
+    report(text.includes(String(value)), `${slug}: 拍摄参数 ${key} 没有渲染到页面上：${value}`);
+  }
+}
+
+// 相册页（scripts/gallery.js）：占位符必须被替换成真正的网格，而且每篇有图的文章
+// 都要在相册里出现——漏掉一篇比样式出错更难发现。
+const galleryHtml = readFileSync(resolve(output, 'gallery/index.html'), 'utf8');
+report(!galleryHtml.includes('<!-- gallery -->'), 'gallery/index.html still contains the gallery placeholder');
+report(galleryHtml.includes('tag-plugin gallery'), 'gallery/index.html is missing the gallery grid');
+// 逐条解码 href 的 pathname（不要整体 decodeHTML，正文里的 `100%` 之类会抛 URIError）
+const $gallery = load(galleryHtml);
+const galleryLinks = $gallery('a[href]').toArray().map(element => {
+  try {
+    return decodeURI(new URL($gallery(element).attr('href'), site).pathname);
+  } catch {
+    return '';
+  }
+});
+for (const article of articles) {
+  const declared = (Array.isArray(article.image) ? article.image : [article.image])
+    .filter(value => typeof value === 'string' && value.length > 0);
+  if (declared.length === 0) continue;
+  report(galleryLinks.includes(decodeURI(new URL(article.url).pathname)),
+    `Article missing from the gallery: ${article.headline}`);
+}
+
+// 站内自定义图标（source/_data/icons.yml）：顶栏用了 default:camera，图标集里没有
+// 对应条目时主题只会渲染一个空 svg，页面照常通过——这里守住它真的被合并进去了。
+const dirIconKeys = ['default:camera'];
+const iconSetsPath = resolve(output, 'js/icons/default.json');
+if (existsSync(iconSetsPath)) {
+  const iconSets = JSON.parse(readFileSync(iconSetsPath, 'utf8'));
+  for (const key of dirIconKeys) {
+    report(Boolean(iconSets.default && iconSets.default[key]),
+      `js/icons/default.json is missing ${key}（检查 source/_data/icons.yml）`);
+  }
 }
 
 // README 与文档之间用相对路径互相引用。这些链接不参与站点构建，所以断了也没人会发现；

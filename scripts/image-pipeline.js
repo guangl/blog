@@ -235,6 +235,11 @@ function classify(html, offset, className) {
       loading: "lazy"
     };
   }
+  // 相册页的网格（scripts/gallery.js 注入，size=xl 固定两列）：不按网格给尺寸的话，
+  // 手机会去下 1600px 的那一档。类名由注入方显式写上，比猜父容器可靠。
+  if (/(^|\s)gallery-photo(\s|$)/.test(className)) {
+    return { sizes: "(max-width: 992px) 50vw, 330px", loading: "lazy" };
+  }
   return { sizes: "(max-width: 992px) 100vw, 860px", loading: "lazy" };
 }
 

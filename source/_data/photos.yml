@@ -1,0 +1,23 @@
+# 每篇文章的拍摄参数（可选）。键是文章文件名去掉 .md，也就是 slug。
+#
+# 为什么放这里而不是 front-matter：Stellar 2.0 的 front-matter schema 是封闭的，
+# 多写一个 `photo:` 字段会被判成「未知字段」丢掉并每次构建告警一行。
+#
+# 只写确定的值，没写的字段会自动从原图 EXIF 里补（相机写进去的那些）；
+# 两处都没有的字段不显示，也不会输出空行。想彻底关掉某篇文章的卡片，把它设为 false。
+#
+# 可用字段：camera 机身、lens 镜头、focal 焦距、aperture 光圈、shutter 快门、
+#           iso 感光度、filter 滤镜、taken 拍摄时间、location 地点
+# 不采集 GPS：地点只认这里手写的 location，EXIF 里的经纬度不输出。
+
+hankou-river-beach:
+  # 这几项是从照片右下角的相机水印读出来的（SONY ILCE-7M5 / 28mm F10 330.0s ISO50），
+  # 不是猜的；原图 EXIF 已被 tools/optimize-images.mjs 重压时剥掉。
+  camera: SONY ILCE-7M5
+  focal: 28
+  aperture: 10
+  shutter: 330
+  iso: 50
+  filter: ND64000 减光镜
+  location: 武汉 · 汉口江滩
+  # 想补拍摄时刻就加一行 `taken: 2026-09-13 20:40`（水印里没有时间）。

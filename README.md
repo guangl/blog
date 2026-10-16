@@ -49,6 +49,8 @@ bun run clean
 - 安全响应头与缓存策略：构建期生成 Cloudflare Pages 的 `_headers`，含 HSTS、CSP、Permissions-Policy（见 [响应头与缓存](#响应头与缓存)）。
 - 无障碍：每页恰好一个 `h1`、每张图都有 `alt`、可缩放的 viewport、「跳到主要内容」链接、首页 Hero 文字对比度 6.27:1（见 [无障碍](#无障碍)）。
 - 本地图标（`favicon.ico` 多尺寸 + `apple-touch-icon.png`）与 404 插图；照片提供封面、正文预览图和大图入口。
+- 拍摄参数卡片：文章末尾列出机身 / 镜头 / 焦距 / 光圈 / 快门 / 感光度 / 滤镜 / 时间 / 地点，手写值优先、原图 EXIF 自动补（见 [拍摄参数与相册](#拍摄参数与相册)）。
+- 相册页 `/gallery/`：构建期把全部文章的正文照片按时间从新到旧铺成网格，点开是灯箱大图、点标题进文章（见 [拍摄参数与相册](#拍摄参数与相册)）。
 - 文章和页脚使用与仓库一致的 CC BY 4.0 协议。
 
 ## 写文章
@@ -75,6 +77,23 @@ cover: /2026/10/16/文章标题/cover.jpg
 
 站点时区为 `Asia/Shanghai`；未来日期的内容不会提前发布（`future: false`），日期写到明天就会「生成了但产物里没有」，排查时先看这个。修改文章时手动更新 `updated`，避免每次部署把旧文章误标为刚刚更新。
 
+拍摄参数**不写在 front-matter 里**：Stellar 2.0 的 front-matter schema 是封闭的，多一个 `photo:` 会被判成未知字段丢掉、并每次构建告警一行。写在 [`source/_data/photos.yml`](source/_data/photos.yml)，键是文章文件名（slug）：
+
+```yaml
+hankou-river-beach:
+  camera: SONY ILCE-7M5
+  focal: 28
+  aperture: 10
+  shutter: 330
+  iso: 50
+  filter: ND64000 减光镜
+  location: 武汉 · 汉口江滩
+```
+
+只写确定的值；没写的字段从原图 EXIF 自动补，两处都没有的字段不显示。详见 [拍摄参数与相册](#拍摄参数与相册)。
+
+相册页不用维护：新文章只要正文里有图（或至少有 `cover`），构建时会自动出现在 `/gallery/`。
+
 ## 图片
 
 照片是本站的主体，构建期由 `scripts/image-pipeline.js` 统一处理，**不需要手工导出多份尺寸**：只要把图放进文章资源目录，构建时会按 `480 / 960 / 1600`（超过 2560 的源图封顶 2560）生成 JPEG / WebP / AVIF 变体，写进产物目录（`public/` 与 `public-domain/` 都不提交进仓库），并把正文里的 `<img>` 改写成 `<picture>`：
@@ -97,6 +116,38 @@ bun run images:compress   # 真正重压（长边 >3840 或 >1.5MB 的 JPEG）
 ```
 
 现有那张 `main.jpg` 已经从 7008×4672 / 4.08MB 压到 3840×2560 / 0.44MB（省 90%），所以正文里的说法是「查看大图」而不是「查看原图」——真正未压缩的原始文件在 Git 历史里（`git log --follow -- source/_posts/hankou-river-beach/main.jpg`）。
+
+## 拍摄参数与相册
+
+### 拍摄参数卡片
+
+`scripts/photo-meta.js` 在文章正文末尾插一张「拍摄参数」卡片，数据两个来源，前者优先：
+
+| 来源 | 位置 | 说明 |
+| --- | --- | --- |
+| 手写 | `source/_data/photos.yml` | 键是文章文件名（slug），只写确定的值 |
+| 原图 EXIF | `source/_posts/<slug>/` 下的 jpg/png | 用 `exifr` 读，不手抄 |
+
+为什么手写的不放 front-matter：Stellar 2.0 的 front-matter schema 是**封闭**的（`node_modules/hexo-theme-stellar/scripts/schema/content-config-rules.js` 里逐字段声明），多写一个 `photo:` 会被判成「未知字段」丢掉，而且每次构建都告警一行。放进 `_data/photos.yml` 同样醒目、还不用和主题的 schema 打架；对一张「拍摄参数表」来说，集中一处其实更好查。自检会守住「`photos.yml` 里写的每个字段都必须真的渲染到对应文章页上」——写了不生效比不写更糟。
+
+为什么还要读 EXIF：本站照片在发布前被 `tools/optimize-images.mjs` 重压过，**EXIF 已经被剥掉**（只剩尺寸标签），所以现有文章只能手写；以后直接丢进来的相机原片会自带 EXIF，卡片就能自己长出来。2026-10-17 用一张手工拼出来的带 ExifIFD 的测试图验过整条链路：机身、镜头、焦距、光圈、快门（`0.005` → `1/200s`）、ISO、拍摄时间都能自动填对。两个刻意的取舍：
+
+- **不输出 GPS**。EXIF 里的经纬度能精确到几米，写进公开网页等于把坐标交给搜索引擎和 Git 历史，所以地点只认手写的 `location`。
+- **`DateTimeOriginal` 按相机记录的墙上时间输出**，不做时区换算（只取年月日时分），否则同一张照片会因为构建机器的时区而挪几个小时。
+
+想给某篇文章关掉卡片，把它的值写成 `false`。字段名与显示名：`camera` 机身、`lens` 镜头、`focal` 焦距、`aperture` 光圈、`shutter` 快门、`iso` 感光度、`filter` 滤镜、`taken` 拍摄时间、`location` 地点。
+
+### 相册页
+
+`scripts/gallery.js` 在构建期扫全部文章，把正文里显示出来的照片按发布时间从新到旧拼成网格，替换掉 [`source/gallery/index.md`](source/gallery/index.md) 里的 `<!-- gallery -->` 占位符——**相册不需要手工维护**，新文章有图就自动出现。取图规则：优先正文图，正文没有图就退回 `cover`；`alt` 用文章标题（多张图会带「第 N 张」）。
+
+三处与主题自带 `{% gallery %}` 标签不同，都是实测产物发现的：
+
+1. **标题放在图片下方，而不是主题的 `.image-meta` 覆盖层里**。那层是 hover 才显形、而且 `pointer-events: none` 的装饰层：鼠标点不动，触屏更没有 hover，于是「点标题进文章」是假的。现在照片本身点开灯箱（Fancybox），下面一行可点的标题进文章。
+2. **网格用 `size="xl"`（两列）+ `aspect_ratio="original"`**。主题默认的 `size="m"` 是 150px 的小格子，不适合看照片；`square` 会把横构图裁成方的——构图都变了，学摄影的站不能这么干。
+3. **`style-src` 必须放行 `gcore.jsdelivr.net`**，否则 Fancybox 的样式表被 CSP 拦掉，点击没有任何反应（见 [响应头与缓存](#响应头与缓存)）。
+
+`scripts/image-pipeline.js` 里给相册图单独写了 `sizes`（`(max-width: 992px) 50vw, 330px`），否则手机会去下 1600px 那一档。相册图靠类名 `gallery-photo` 识别——注入方显式写上，比按父容器猜可靠。
 
 ## 无障碍
 
@@ -132,7 +183,9 @@ node tools/browser-check.mjs --shot /tmp/page-{page}.png /   # 顺便存一张�
 
 Cloudflare Pages 的 `_headers` 由 `scripts/cloudflare-headers.js` 在构建期写进产物根目录。**不能直接放 `source/_headers`**：Hexo 会忽略 `source/` 下以 `_` 开头的文件和目录，那个文件根本不会被复制进产物。
 
-`/*` 上挂着安全头：`Strict-Transport-Security`（一年，含子域，暂不进 preload）、`Content-Security-Policy`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy`、`Cross-Origin-Resource-Policy`。CSP 里必须显式放行主题运行时按需加载的第三方来源：`gcore.jsdelivr.net`（mermaid / marked / vanilla-lazyload）、`unpkg.com`（swiper）、`cdnjs.cloudflare.com`（MathJax，含 `font-src`），以及拉取 GitHub 仓库信息的 `connect-src api.github.com`。CSP 目前含 `'unsafe-inline'`（主题有内联脚本与构建期注入的内联样式），它挡不住内联脚本注入，但仍能挡住「本站没有放行的外部来源」。
+`/*` 上挂着安全头：`Strict-Transport-Security`（一年，含子域，暂不进 preload）、`Content-Security-Policy`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy`、`Cross-Origin-Resource-Policy`。CSP 里必须显式放行主题运行时按需加载的第三方来源：`gcore.jsdelivr.net`（脚本：mermaid / marked / vanilla-lazyload；样式：Fancybox 灯箱）、`unpkg.com`（swiper）、`cdnjs.cloudflare.com`（MathJax，含 `font-src`），以及拉取 GitHub 仓库信息的 `connect-src api.github.com`。CSP 目前含 `'unsafe-inline'`（主题有内联脚本与构建期注入的内联样式），它挡不住内联脚本注入，但仍能挡住「本站没有放行的外部来源」。
+
+`style-src` 里的 `gcore.jsdelivr.net` 是 2026-10-17 加相册页时补的：主题的 lightbox 扩展只在页面出现 `[data-fancybox]`（相册、以后的图集）时才挂载，并从那里拉 Fancybox 的 CSS。不放行的话灯箱样式表被拦、点击没有任何反应，而控制台只在打开相册页时才会报——`bun run browser:a11y` 按 `_headers` 起本地服务，正好能提前抓到这种「只有某个页面才踩到」的 CSP 问题。`tools/check-site.mjs` 现在会断言 `style-src` 放行了它。
 
 缓存策略给 CSS / JS / 图片一周的 `stale-while-revalidate`，`sitemap.xml` / `atom.xml` / `search.json` / `robots.txt` 一小时。这里有两条 Cloudflare 的规则在约束写法，别按直觉改：
 
@@ -191,6 +244,9 @@ node tools/audit-live.mjs --base http://127.0.0.1:4001/   # 换目标（比如�
 | 公式 / 图表 / 时间线的验证页 | `source/examples/index.md` |
 | 订阅正文的相对资源路径与版权 | `templates/atom.xml` |
 | 响应式图片与变体生成 | `scripts/image-pipeline.js` |
+| 拍摄参数（手写部分） | `source/_data/photos.yml` |
+| 相册页文案与占位符 | `source/gallery/index.md` |
+| 站内自定义图标 | `source/_data/icons.yml` |
 | 站点地图的 URL 与图片/归档补全 | `templates/sitemap.xml`、`scripts/sitemap-extras.js` |
 | 安全响应头与缓存策略 | `scripts/cloudflare-headers.js` |
 | `h1` / `alt` / skip link 等无障碍修正 | `scripts/a11y.js` |
@@ -333,6 +389,9 @@ bun run seo:ping       # 推送 IndexNow
 | `beian.js` | 备案号页脚，留空时完全不输出 |
 | `canonical-notice.js` | 关掉主题的「非法克隆站 / 官方备用站」浮层 |
 | `lazy-images.js` | 给已经有真实 `src` 的图补原生 `loading` / `decoding` |
+| `photo-meta.js` | 文章末尾的拍摄参数卡片（手写 + EXIF） |
+| `gallery.js` | 相册页：扫全部文章的照片铺成网格 |
+| `photo-index.js` | 上面两个插件共用的「这篇文章有哪些照片」工具 |
 | `sitemap-extras.js` | 图片 sitemap 与 `/posts/`、归档页补进 `sitemap.xml`（见 [搜索引擎收录](#搜索引擎收录)） |
 
 `_config.stellar.yml` 的 `inject.head_end` 负责两件事：图标链接（`favicon.ico` 与 `apple-touch-icon.png`）和首页 Hero 的对比度修正。

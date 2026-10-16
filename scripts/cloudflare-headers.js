@@ -44,10 +44,19 @@ const SCRIPT_SOURCES = [
   "https://cdnjs.cloudflare.com" // MathJax（仅含公式的页面）
 ];
 
+// 样式表来源。除了本站与内联样式，还要放行 jsdelivr：主题的 lightbox 扩展在页面出现
+// `[data-fancybox]`（相册页、以后正文里的图集）时才按需挂载，并从那里拉 Fancybox 的 CSS。
+// 不放行的话灯箱样式表被拦、点了没反应，而且只有打开相册页才会暴露——2026-10-17 实测到的。
+const STYLE_SOURCES = [
+  "'self'",
+  "'unsafe-inline'",
+  "https://gcore.jsdelivr.net" // Fancybox（@fancyapps/ui）
+];
+
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   `script-src ${SCRIPT_SOURCES.join(" ")}`,
-  "style-src 'self' 'unsafe-inline'",
+  `style-src ${STYLE_SOURCES.join(" ")}`,
   "img-src 'self' data:",
   // MathJax 的公式字形是从 cdnjs 拉的 woff，不放行就只剩豆腐块
   "font-src 'self' data: https://cdnjs.cloudflare.com",
