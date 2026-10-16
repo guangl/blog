@@ -1,6 +1,6 @@
-# guangluo's blog
+# 个人摄影学习之路
 
-基于 [Hexo](https://hexo.io/) 和 [Stellar](https://github.com/xaoxuu/hexo-theme-stellar) 的个人博客，使用中文记录一名 DBA 的数据库管理、运维经验与摄影随记。
+基于 [Hexo](https://hexo.io/) 和 [Stellar](https://github.com/xaoxuu/hexo-theme-stellar) 的个人站点，用中文记录学习摄影的过程：曝光、构图、后期的练习笔记，以及出门拍到的照片。
 
 线上地址：<https://blog.guangluo.top/>
 
@@ -61,9 +61,9 @@ title: 文章标题
 date: 2026-10-16 10:00:00
 updated: 2026-10-16 10:00:00
 categories:
-  - 数据库
+  - 摄影
 tags:
-  - PostgreSQL
+  - 长曝光
 description: 一两句话说明文章内容，也作为列表摘要。
 cover: /2026/10/16/文章标题/cover.jpg
 ```
@@ -71,16 +71,6 @@ cover: /2026/10/16/文章标题/cover.jpg
 图片放在同名资源目录中，正文可使用 `![说明](preview.jpg)` 引用。封面填写以 `/` 开头的站内公开路径。图片较大时建议单独准备预览图，原图可通过普通链接提供。现有摄影文章保留了 `main.jpg` 原图。
 
 站点时区为 `Asia/Shanghai`；未来日期的内容不会提前发布。修改文章时手动更新 `updated`，避免每次部署把旧文章误标为刚刚更新。
-
-### DBA 实践文章
-
-```bash
-bunx hexo new dba "文章标题"
-```
-
-使用 `scaffolds/dba.md` 创建文章，按普通文章布局展示，默认归入「数据库运维」。模板包括结论、环境与版本、问题现象、排查过程、处理步骤、验证结果、回退方案和总结参考。写作提示放在 Markdown 注释里，不会显示在网页正文中。
-
-新文章会写入 `source/_posts/`，填写真实案例后再随站点发布。按实际内容调整分类、标签、摘要和小节；摄影与生活随记继续使用普通的 `post` 模板。
 
 ## 验证与发布
 
@@ -103,49 +93,15 @@ Pull Request 会执行检查；合并到 `main` 后，GitHub Actions 会构建�
 | 欢迎语和侧栏组件 | `source/_data/widgets.yml` |
 | 关于与订阅说明 | `source/about/`、`source/subscribe/` |
 | 首页大图、文档树、介绍和入口 | `source/_data/wiki/home.yml`、`source/index.md` |
-| 专栏定义 | `source/_data/topic.yml`、`source/_data/topic/*.yml` |
-| 笔记本定义 | `source/_data/notebooks/*.yml` |
-| 笔记正文 | `source/notebooks/<笔记本 ID>/` |
 | 订阅正文的相对资源路径与版权 | `templates/atom.xml` |
-| DBA 实践文章模板 | `scaffolds/dba.md` |
 
-## 专栏与笔记本
+## 关于专栏与笔记本
 
-两者都用于组织已有内容，但定位不同。
+2026-10-17 起站点只保留摄影内容，`topic`（专栏）与 `notebooks`（笔记本）两套栏目连同 `source/_data/topic*.yml`、`source/_data/notebooks/`、`source/notebooks/` 一起移除，顶栏菜单、页脚入口和自检里的必查页面同步删掉。
 
-**专栏（Topic）**适合有明确阅读顺序的系列文章。文章本身仍然放在 `source/_posts/`，保留原有分类、标签和发布时间，只在 Front Matter 里声明归属：
+主题本身仍然支持这两套集合，需要时按 [Stellar 官方文档](https://xaoxuu.com/wiki/stellar/) 重新加回配置即可；被删掉的定义文件在 Git 历史里能找到。
 
-```yaml
-collection:
-  profile: topic
-  id: dba-troubleshooting
-```
-
-专栏在 `source/_data/topic/<id>.yml` 定义，`listing.sort` 决定阅读顺序（本站在用 `date asc`）。`source/_data/topic.yml` 的 `publish_list` 控制哪些专栏出现在总索引；总索引在 `/topic/`。
-
-注意：专栏**没有独立主页**，`route.path` 在当前主题版本不会生成页面。`/topic/` 的封面卡片指向阅读顺序里的第一篇文章，其余成员按顺序列在下方。
-
-**笔记本（Notebook）**适合持续补充、按多级标签检索的记录。笔记放在 `source/notebooks/<笔记本 ID>/`，标签用 `/` 表达层级：
-
-```yaml
-# source/_data/notebooks/dba.yml
-name: DBA 手记
-route:
-  path: /notebooks/dba/
-```
-
-用主题命令创建笔记，Front Matter 由主题生成：
-
-```bash
-bunx hexo stellar new note --notebook dba --title "标题" --tags "postgresql/运维,checklist"
-```
-
-两个坑值得记下来：
-
-1. **笔记 URL 与 source 目录必须一致**。笔记的路由由 `source/notebooks/<id>/` 推导，不是由 `route.path` 决定；如果把 source 放在 `source/notes/` 而 `route.path` 写 `/notes/dba/`，列表页会落在 `/notes/dba/` 但笔记链接指向不存在的 `/notebooks/dba/...`。保持 source 在 `source/notebooks/` 即可。
-2. **手工创建笔记文件可能不被 Hexo 收录**。用 `bunx hexo stellar new note` 生成后再编辑正文，比直接新建 Markdown 文件可靠。
-
-图标名要用主题图标集里的真实名称。`default:notes` 不存在，会被当成文本渲染并挤坏顶栏；笔记本应使用 `default:notebook`。可用名称见构建产物 `public/js/icons/default.json`。
+图标名要用主题图标集里的真实名称，可用名称见构建产物 `public/js/icons/default.json`。
 
 正式入口为 `https://blog.guangluo.top/`，所有构建都使用根路径。旧 GitHub Pages 发布任务已移除，GitHub 继续保存源码并运行检查与 Cloudflare 自动发布。
 

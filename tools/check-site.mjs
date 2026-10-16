@@ -52,10 +52,14 @@ function localTarget(value, base, context) {
 
 assert(existsSync(output), 'Run bun run build before checking the site.');
 for (const path of ['index.html', 'posts/index.html', 'about/index.html', 'subscribe/index.html', 'archives/index.html',
-  'categories/index.html', 'tags/index.html', 'topic/index.html', 'notebooks/index.html', 'notebooks/dba/index.html',
+  'categories/index.html', 'tags/index.html',
   '404.html', 'atom.xml', 'search.json', 'sitemap.xml', 'robots.txt']) {
   report(existsSync(resolve(output, path)), `Missing required page: ${path}`);
 }
+
+// 首页 Hero 的标题来自 source/_data/wiki/home.yml 的 headline。
+// 这里从数据文件读期望值，而不是把文案硬编码进自检——否则每次改标题都会误报一次。
+const homeHeadline = ((yaml.load(readFileSync('source/_data/wiki/home.yml', 'utf8')) || {}).headline || '').trim();
 
 const pages = files(output).filter(path => path.endsWith('.html'));
 const articles = [];
@@ -68,7 +72,8 @@ for (const file of pages) {
   report(Boolean($('title').text().trim()), `${path}: missing title`);
   report(Boolean($('meta[name="description"]').attr('content')), `${path}: missing description`);
   if (path === 'index.html') {
-    report($('.wiki-hero h1').text() === '记录问题，也记录风景。', 'Native homepage hero is missing');
+    report(Boolean(homeHeadline) && $('.wiki-hero h1').text().trim() === homeHeadline,
+      'Native homepage hero is missing or does not show the configured headline');
     report($('.wiki-hero a[href="#start"]').length > 0 && $('#start').length === 1, 'Homepage reading anchor is missing');
   }
   report($('main, [role="main"]').length === 1, `${path}: missing main landmark`);

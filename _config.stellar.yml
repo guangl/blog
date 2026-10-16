@@ -7,21 +7,13 @@ topbar:
       src: /images/avatar.png
       variant: icon
     name: "个人摄影学习之路"
-    tagline: "数据库 · 运维 · 生活"
+    tagline: "摄影 · 练习 · 记录"
     href: /
   menu:
     - id: post
       icon: default:documents
       title: 文章
       url: /posts/
-    - id: topic
-      icon: default:pin
-      title: 专栏
-      url: /topic/
-    - id: notebooks
-      icon: default:notebook
-      title: 笔记本
-      url: /notebooks/
     - id: archives
       icon: default:calendar
       title: 归档
@@ -45,7 +37,7 @@ leftbar:
       src: /images/avatar.png
       variant: icon
     name: "个人摄影学习之路"
-    tagline: "数据库 · 运维 · 生活"
+    tagline: "摄影 · 练习 · 记录"
     href: /
     search: true
   # 导航已在顶部栏，左侧栏不再重复；Wiki 页面会用文档树替换这里的内容。
@@ -107,32 +99,8 @@ profiles:
       widgets: [toc]
   wiki_index:
     path: null
-  # 专栏：文章仍留在 _posts/，这里只控制列表页与高亮的菜单项。
-  topic:
-    path: /topic/
-    active_menu: topic
-    leftbar:
-      widgets: [recent, tagcloud]
-    rightbar:
-      widgets: [ghrepo, toc]
-  # 笔记本：总索引 + 单本列表页 + 笔记详情页，左栏用标签树整理。
-  notebooks:
-    path: /notebooks/
-    active_menu: notebooks
-    leftbar:
-      widgets: [recent, tagcloud]
-    rightbar:
-      widgets: []
-  notebook:
-    active_menu: notebooks
-    leftbar:
-      widgets: [tagtree, recent]
-    rightbar:
-      widgets: []
-  note:
-    active_menu: notebooks
-    leftbar:
-      widgets: [tagtree, recent]
+  # 专栏与笔记本两个栏目已随内容一起移除（2026-10-17）：
+  # 站点只保留摄影内容，_posts/ 与归档、分类、标签足够承载。
     rightbar:
       widgets: [toc]
   error:
@@ -183,14 +151,11 @@ footer:
     - title: 阅读
       items:
         - "[所有文章](/posts/)"
-        - "[专栏](/topic/)"
-        - "[笔记本](/notebooks/)"
         - "[归档](/archives/)"
     - title: 检索
       items:
         - "[分类](/categories/)"
         - "[标签](/tags/)"
-        - "[DBA 手记](/notebooks/dba/)"
         - "[订阅更新](/subscribe/)"
     - title: 本站
       items:
