@@ -2,6 +2,7 @@
 title: 家庭网络改造实录：用 UBNT 策略路由 + WireGuard + Surge 做 IP 级分流
 date: 2026-10-18 03:10:00
 updated: 2026-10-18 03:50:51
+permalink: 2026/10/17/network-rebuild/
 categories:
   - 网络
 tags:
