@@ -52,7 +52,7 @@ Token 只放在 GitHub Secret，不提交到仓库。当前本机 Wrangler 的 O
 bun run deploy:domain
 ```
 
-命令会先执行主题 Doctor、重新构建并检查，再将 `public-domain/` 上传到已有的 `guangluo-blog` 项目。Stellar 已升级并固定为 `2.0.0`，配置与页面字段已迁移。正式域名与根路径统一在 `_config.yml` 配置，`_config.domain.yml` 仅指定上传目录。首页使用原生 Wiki Hero，没有自定义 JS、CSS 或路径适配脚本。
+命令会先执行主题 Doctor、重新构建并检查，再将 `public-domain/` 上传到已有的 `guangluo-blog` 项目。Stellar 已升级并固定为 `2.0.0`，配置与页面字段已迁移。正式域名与根路径统一在 `_config.yml` 配置，`_config.domain.yml` 仅指定上传目录。首页用 Stellar 原生的 Wiki 布局，没有自定义 JS、CSS 或路径适配脚本；Hero 自 2026-10-17 起关闭（`source/_data/wiki/home.yml` 的 `hero.enabled: false`），首页直接从正文开始。
 
 ## 手动上传备用方式
 

@@ -17,13 +17,16 @@ navigation:
     站内导航:
       - about/
       - subscribe/
+# 首页 Hero：**关闭**（2026-10-17 起）。首页直接从正文开始「关于这个小站」。
+# 原来的 Hero 是首页唯一的首屏大图：1600px 档 62 KB，`sizes: 100vw` 让手机也得下它，
+# 而且它只是张装饰图，没有信息量。主题的 wiki_cover.ejs 在 `enabled: false` 时
+# 整个 cover 都不渲染（连 640px 的容器都不输出），所以不需要额外补 CSS。
+# 想加回来：enabled 改 true，再在 hero 下写 background.image（parallax 一并写），
+# 并到 _config.stellar.yml 的 inject.head_end 里恢复白色文字的对比度修正。
 hero:
-  enabled: true
-  background:
-    image: /2026/09/13/hankou-river-beach/preview.jpg
-    parallax: 0.2
-  # Hero 右侧原来是「Hexo / Bun」本地运行命令块，按需求去掉：
-  # 不写 preview 时主题会走 without-preview 布局，Hero 只剩背景与标题。
+  enabled: false
+  # 右侧原来是「Hexo / Bun」本地运行命令块，按需求去掉：
+  # 不写 preview 时主题会走 without-preview 布局。
   actions:
     - title: 文章归档
       url: /archives/

@@ -200,6 +200,19 @@ curl --resolve blog.guangluo.top:443:<公网IP> https://blog.guangluo.top/
 
   这条路没有自动化，每 3 个月要手动走一遍。
 
+## 传输压缩（gzip）
+
+`deploy/server-setup.sh` 会写一份 http 级的 `/etc/nginx/conf.d/blog-compression.conf`，三个入口（80 的 IP 默认站点、80 的域名站点、443 的主站点）都继承它。
+
+为什么不在 `server` 块里配：nginx 的 `gzip` 只作用于所在的块及其子块。压缩原来只写在 443 主站块里，于是**备案前唯一能用的 IP 入口反而不压缩**——同一份 `main.css`，Cloudflare 上发 50 KB，ECS 上发 388 KB。ECS 单流带宽实测约 220 KB/s，这一项就差 1.5 秒。
+
+实测（2026-10，武汉电信）：首页 10 个资源合计 532 KB → 151 KB，串行取完 0.85 s（原来仅 `main.css` 一项就要 1.77 s）。
+
+两个容易踩的点：
+
+- **Debian 自带的 `nginx.conf` 已经有一行 http 级 `gzip on;`**（`gzip_types` 全是注释，默认只压 `text/html`）。脚本会先检测它，有就只补参数，否则再写一遍会 `duplicate directive "gzip"`，`nginx -t` 直接失败。配置写完立刻验一次，不过就删掉自己的文件并退出，不会留下起不来的 nginx。
+- 内容没变时脚本不重写、不 reload，所以这条通道可以反复跑。
+
 ## 日常发布与回滚
 
 - 合并到 `main`：Cloudflare Pages 与腾讯云 ECS **两条通道都会更新**。

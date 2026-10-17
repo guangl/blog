@@ -53,6 +53,8 @@ SKIP_CERT=0
 
 AVAILABLE='/etc/nginx/sites-available/blog.guangluo.top'
 ENABLED='/etc/nginx/sites-enabled/blog.guangluo.top'
+# 压缩配置放在 conf.d（http 级），三个入口共用，详见 install_compression_conf
+COMPRESSION_CONF='/etc/nginx/conf.d/blog-compression.conf'
 # 证书根目录：下面每个域名一个子目录，各放 fullchain.pem + privkey.pem。
 # letsencrypt 时 certbot 只给「主域名」建目录，备用域名共用它那份（一张证书带 SAN）；
 # tencent 时每个域名各有各的目录（免费证书是单域名，只能一张一个）。
@@ -304,11 +306,9 @@ server {
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()" always;
     add_header Cross-Origin-Resource-Policy "same-origin" always;
 
-    gzip on;
-    gzip_vary on;
-    gzip_comp_level 5;
-    gzip_min_length 256;
-    gzip_types text/plain text/css text/xml application/xml application/javascript application/json image/svg+xml;
+    # 压缩不在这里配：gzip 提到了 http 级（/etc/nginx/conf.d/blog-compression.conf，
+    # 由 install_compression_conf 写入）。写在这个 443 块里只覆盖这一台站点，
+    # 而 IP 直连走的是 80 的默认站点，那样它会原样发 388KB 的 main.css。
 
     # Hexo 的目录式链接（/posts/、/2026/09/13/xxx/）落在各自的 index.html 上
     location / {
@@ -374,6 +374,88 @@ fill_placeholders() {
       -e "s|__PKI_ROOT__|$PKI_ROOT|g" \
       -e "s|__CERT_BASE__|$CERT_BASE|g" \
       -e "s|__DOMAIN__|$DOMAIN|g"
+}
+
+# ---------------------------------------------------------------------------
+# 2.5 压缩（http 级）
+#
+# 为什么放 conf.d 而不是某个 server 块里：nginx 的 gzip 只作用于「所在的块及其子块」。
+# 写在 443 主站块里，就只覆盖那一台站点；而本站有三个入口——
+#   · 80 的默认站点（IP 直连，备案前唯一能用的入口）
+#   · 80 的域名站点（还没有证书时直接给内容）
+#   · 443 的主站点
+# 只配在 443 上，前两个入口就会把 388KB 的 main.css 原样发出去。而 ECS 单流带宽
+# 实测约 220KB/s，这一项就差 1.5 秒。放到 http 级后三个入口都吃到同一份配置，
+# 也不存在「以后再开一个入口忘了配压缩」这个问题。
+#
+# 只写压缩，不碰缓存头 / sendfile / open_file_cache，那些要单独评估。
+# ---------------------------------------------------------------------------
+# nginx.conf（http 级）里是否已经有生效的 `gzip on;`？
+# Debian 自带的 /etc/nginx/nginx.conf 默认就有一行，但它下面的 gzip_types
+# 全是注释——默认只压 text/html，所以 CSS / JS 其实是原样发出去的。
+# 我们要补的正是那些参数；可 `gzip on` 在同一个 http 块里再写一遍会报
+# `duplicate directive "gzip"`，nginx -t 直接失败，所以先看一眼主配置。
+main_conf_enables_gzip() {
+  grep -qE '^[[:space:]]*gzip[[:space:]]+on[[:space:]]*;' /etc/nginx/nginx.conf 2>/dev/null
+}
+
+write_compression_conf() {
+  cat <<'NGINX'
+# 由 deploy/server-setup.sh 生成，重跑脚本会覆盖，别在这里手改。
+#
+# 这份文件由 /etc/nginx/nginx.conf 里的 `include /etc/nginx/conf.d/*.conf;`
+# 带进 http 块，所以三个入口（80 默认站点 / 80 域名站点 / 443 主站点）都继承它。
+# 实测 main.css 388 KB → gzip 后约 50 KB；首页资源合计约 532 KB → 约 90 KB。
+NGINX
+  if main_conf_enables_gzip; then
+    printf '%s\n' '# gzip on 由 nginx.conf 提供，这里只补它没写的那些参数。'
+  else
+    printf '%s\n' '# nginx.conf 里没有 http 级的 gzip on，这里自己打开。' 'gzip on;'
+  fi
+  cat <<'NGINX'
+gzip_vary on;
+gzip_comp_level 5;
+gzip_min_length 256;
+# 以后接腾讯云 CDN / EdgeOne 时，回源请求带 Via / X-Forwarded-For，
+# 不设 any 的话这类请求会绕过压缩，CDN 回源拿到的就是原始大小。
+gzip_proxied any;
+gzip_types
+    text/plain
+    text/css
+    text/xml
+    text/javascript
+    application/javascript
+    application/json
+    application/xml
+    application/rss+xml
+    application/atom+xml
+    application/ld+json
+    application/manifest+json
+    image/svg+xml;
+NGINX
+}
+
+install_compression_conf() {
+  local target="$COMPRESSION_CONF" tmp
+  mkdir -p "$(dirname "$target")"
+  tmp=$(mktemp)
+  write_compression_conf > "$tmp"
+
+  # 内容没变就不动文件、不 reload，重跑脚本时不会白白抖一下 nginx
+  if [ -f "$target" ] && cmp -s "$tmp" "$target"; then
+    rm -f "$tmp"
+    log "压缩配置已是最新：$target"
+    return 0
+  fi
+
+  install -m 644 "$tmp" "$target"
+  rm -f "$tmp"
+
+  if ! nginx -t; then
+    rm -f "$target"
+    die "压缩配置没通过 nginx -t，已移除 $target（站点配置未受影响）。若报 duplicate directive，说明 nginx.conf 里已有同名指令，删掉本文件里对应的一行即可"
+  fi
+  log "已写入压缩配置：$target"
 }
 
 # 装上配置并用 nginx -t 校验；校验失败就回滚到上一份，绝不让 nginx 起不来
@@ -473,6 +555,8 @@ done
 # ---------------------------------------------------------------------------
 MAIN_CERT_DIR=''
 MAIN_CERT_DIR=$(cert_dir_for "$DOMAIN" || true)
+# 压缩先装：它只改 conf.d，和站点配置无关，失败时不会连累下面的站点配置
+install_compression_conf
 install_config
 
 # ---------------------------------------------------------------------------

@@ -7,13 +7,16 @@
  *   - 浏览器无法在 JS 执行前得知图片可以延后，CP 感知更晚；
  *   - 一旦 JS 失败或被拦，占位图会永久留在页面上。
  *
- * 这里给「已经有真实 src」的图片补上原生 `loading="lazy"` 与 `decoding="async"`，
- * 让浏览器自身也参与调度，与主题的 JS 方案叠加而不冲突。
+ * 这里给**所有已经有真实 src、又没被别处定过 loading 的图**补上原生
+ * `loading="lazy"` 与 `decoding="async"`，让浏览器自己也参与调度：
+ *   - 主题 `.lazy` 图（真地址还在 `data-src`、`src` 是占位）跳过：那种图必须等主题
+ *     JS 换 src，硬加原生 lazy 一旦 JS 没跑就是永久占位图（属于回归）；
+ *   - 图片管线改写过的 `<picture>` 自带 `loading="lazy"`，这里直接放行；
+ *   - 主题标了 `no-lazy` 的头像也一并补上（2026-10-17 起）。
  *
- * 刻意跳过 `src` 仍是 data: 占位的图片：那种图必须靠主题 JS 换上真地址，
- * 若给它们加原生 lazy，一旦 JS 未执行就会变成永久占位图（属于回归）。
- *
- * 也不处理 Hero 首屏图：它常是 LCP 元素，延后加载只会推迟最大内容绘制。
+ * 2026-10-17 之前这里刻意跳过 Hero 首屏图（它常是 LCP）。首页 Hero 的背景大图已经
+ * 去掉了（见 source/_data/wiki/home.yml），站点上不再有「值得抢首屏」的图片，
+ * 所以这个例外一起删掉，规则收敛成「全部懒加载」。
  */
 
 "use strict";
@@ -24,14 +27,14 @@ function isPlaceholder(source) {
 
 function addLazyAttributes(html) {
   return html.replace(/<img\b[^>]*>/gi, tag => {
-    if (!/\bclass="[^"]*\blazy\b/i.test(tag)) return tag;
+    // 已经有 loading 的说明别处（图片管线）明确表态过，不再覆盖
+    if (/\bloading=/i.test(tag)) return tag;
     const src = (tag.match(/\bsrc="([^"]*)"/i) || [])[1];
-    if (src === undefined || isPlaceholder(src)) return tag;
+    if (src === undefined || src === "" || isPlaceholder(src)) return tag;
 
     let out = tag;
-    if (!/\bloading=/i.test(out)) out = out.replace(/<img\b/i, '<img loading="lazy"');
     if (!/\bdecoding=/i.test(out)) out = out.replace(/<img\b/i, '<img decoding="async"');
-    return out;
+    return out.replace(/<img\b/i, '<img loading="lazy"');
   });
 }
 

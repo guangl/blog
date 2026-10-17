@@ -22,8 +22,11 @@
  *     而 `<picture>` 的 `<source>` 一旦被浏览器选中，再改 `<img src>` 就没用了，
  *     两者会打架（占位图永久留下或图片被迫立刻加载）。所以这里把 `.lazy` 类与
  *     `data-src` 一起去掉，改用原生 `loading="lazy"`。
- *   - **装饰性大图改为立刻加载**。Hero 背景与文章页头图通常就是 LCP 元素，
- *     延后加载只会让 LCP 更差，所以给它们 `loading="eager"` + `fetchpriority="high"`。
+ *   - **装饰性大图也懒加载**（2026-10-17 改）。以前 Hero 背景和文章页头图被标成
+ *     `loading="eager"` + `fetchpriority="high"`，理由是它们通常是 LCP 元素。
+ *     现在首页 Hero 已经没有背景图了，剩下的装饰图（文章页头图）统一懒加载：
+ *     首屏不再抢带宽，浏览器自己的懒加载判定对「已经在视口里」的图仍是立即取，
+ *     只是不再用 fetchpriority 强行插队。
  *
  * 只处理文章资源目录（`source/_posts/<slug>/`）里的图；站点图标、头像不参与。
  * 想压小 source/ 里的原图体积用 `bun run images:compress`（那是人工确认的操作）。
@@ -217,30 +220,23 @@ function withDimensions(tag, width, height) {
     .replace(/<img\b/i, `<img width="${width}" height="${height}"`);
 }
 
-/** 按出现位置判断这张图是「全宽装饰背景」「列表卡片封面」还是「正文插图」。 */
+/** 按出现位置判断这张图是「全宽装饰背景」「列表卡片封面」还是「正文插图」，只负责挑 sizes。 */
 function classify(html, offset, className) {
   const before = html.slice(Math.max(0, offset - 260), offset);
   const decorative = /wiki-cover-background/.test(className)
     || /(^|\s)bg(\s|$)/.test(className)
     || /aria-hidden="true"[^>]*>\s*$/.test(before);
-  if (decorative) {
-    // 主题会给图片 Hero 再叠一张 blur 图（底部渐隐用），它和主图是同一个地址、
-    // 由浏览器缓存共享，没必要也标成高优先级，缓一缓无所谓。
-    if (/blur/.test(className)) return { sizes: "100vw", loading: "lazy" };
-    return { sizes: "100vw", loading: "eager", fetchpriority: "high" };
-  }
+  // 装饰图都是全宽：首页 Hero 背景已经去掉，剩下的是文章页头图这类通栏图。
+  if (decorative) return { sizes: "100vw" };
   if (/post-cover[^>]*>\s*$/.test(before)) {
-    return {
-      sizes: "(max-width: 576px) 100vw, (max-width: 992px) 50vw, 360px",
-      loading: "lazy"
-    };
+    return { sizes: "(max-width: 576px) 100vw, (max-width: 992px) 50vw, 360px" };
   }
   // 相册页的网格（scripts/gallery.js 注入，size=xl 固定两列）：不按网格给尺寸的话，
   // 手机会去下 1600px 的那一档。类名由注入方显式写上，比猜父容器可靠。
   if (/(^|\s)gallery-photo(\s|$)/.test(className)) {
-    return { sizes: "(max-width: 992px) 50vw, 330px", loading: "lazy" };
+    return { sizes: "(max-width: 992px) 50vw, 330px" };
   }
-  return { sizes: "(max-width: 992px) 100vw, 860px", loading: "lazy" };
+  return { sizes: "(max-width: 992px) 100vw, 860px" };
 }
 
 function pictureMarkup(entry, tag, context) {
@@ -268,9 +264,9 @@ function pictureMarkup(entry, tag, context) {
   img = withAttribute(img, "src", variantUrl(entry, largest, FORMATS[2]));
   img = withAttribute(img, "srcset", srcsetOf(FORMATS[2]));
   img = withAttribute(img, "sizes", context.sizes);
-  img = withAttribute(img, "loading", context.loading);
-  img = withAttribute(img, "decoding", context.fetchpriority ? "sync" : "async");
-  if (context.fetchpriority) img = withAttribute(img, "fetchpriority", context.fetchpriority);
+  // 全部原生懒加载：首页 Hero 已经没有大图，剩下的图都不值得抢首屏带宽。
+  img = withAttribute(img, "loading", "lazy");
+  img = withAttribute(img, "decoding", "async");
   return `<picture>${sources}${img}</picture>`;
 }
 

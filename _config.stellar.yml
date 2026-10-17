@@ -234,23 +234,28 @@ fallbacks:
 ## 两个文件由 `bun run favicon` 从 source/images/favicon.svg 生成，产物提交进仓库。
 ##
 ## Hero 对比度：主题只为视频 / 动效英雄加遮罩，图片英雄只有一层「底部渐隐到页面底色」，
-## 标题、简介和按钮直接压在照片上。2026-10-17 用无头 Chrome 实测首页：
+## 标题、简介和按钮直接压在照片上。2026-10-17 用无头 Chrome 实测首页（当时有背景图）：
 ##   修之前：小字（简介、导航、四个按钮）2.56:1，WCAG AA 需要 4.5:1 —— 不达标；
 ##           大标题 3.6:1，大字门槛 3:1，勉强达标。
 ##   修之后：全部 6.27:1（主按钮反色后 21:1），浅色与深色外观都达标。
 ##
-## 两处一起改：
-##   1. 在模糊层（z-index 1）和主题自己的渐隐层（z-index 3）之间插一层半透明黑遮罩，
-##      不覆盖主题原有的「底部渐隐」效果。取 .30 是「照片还看得清」与「对比度留余量」
-##      之间折中的结果：.42 能到 8:1，但照片明显发闷。
-##   2. 把 Hero 里的文字颜色一律钉成白色。主题的 adaptive-text 会按图片平均色
-##      在白 / 黑之间自动选色，落到哪一侧取决于照片内容；这里用 !important 压过它
-##      写在元素上的内联变量，让对比度只由遮罩决定，换照片也不会突然翻车。
+## ⚠️ 现状（2026-10-17 晚）：首页 Hero 已经整个关掉了，见 source/_data/wiki/home.yml
+## 的 `hero.enabled: false`——首页直接从正文开始，不再有首屏大图。主题在 cover 关闭时
+## 连容器都不渲染，所以下面这段目前命中不到任何元素，留着是为了「哪天把图加回来」
+## 时不用重新推导一遍。
 ##
-## ⚠️ 遮罩保证的是「这张照片」。换成天空占比更大、整体更亮的照片时，同一层遮罩可能
-## 不够——务必重新量：`node tools/browser-check.mjs /` 打印每段 Hero 文字的实测对比度，
-## 深色外观加 `--dark`。极端情况要把 .30 调大。刻意不写进 check-site：那需要在 CI 里
-## 跑无头浏览器，代价大于收益。
+## 把 Hero 加回来时注意两点：
+##   1. 遮罩要盖在模糊层（z-index 1）和主题自己的渐隐层（z-index 3）之间，且不破坏
+##      「底部渐隐」；取 .30 是「照片还看得清」与「对比度留余量」的折中（.42 能到
+##      8:1，但照片发闷）。
+##   2. 文字钉白色必须限定成「真的有图片背景」。主题的 adaptive-text 会按图片平均色
+##      在白 / 黑之间选色，落到哪一侧取决于照片；而没有图时 Hero 退回
+##      `background: var(--background)` + `color: var(--text)`，浅色主题就是白底黑字，
+##      再钉白色就成了白底白字。所以下面用 `:has()` 限定。
+##
+## 遮罩保证的是「那张照片」。换图后要重新量：`node tools/browser-check.mjs /`
+## 打印每段 Hero 文字的实测对比度，深色外观加 `--dark`。极端情况把 .30 调大。
+## 刻意不写进 check-site：那需要在 CI 里跑无头浏览器，代价大于收益。
 inject:
   head_end: |
     <link rel="icon" href="/favicon.ico" sizes="any">
@@ -264,8 +269,9 @@ inject:
         pointer-events: none;
         background: rgba(0, 0, 0, .30);
       }
-      .cover-content.wiki-hero,
-      .cover-content.wiki-hero * {
+      /* :has() 是必须的：没有图片背景时不能套白色文字，否则浅色主题是白底白字。 */
+      .cover-content.wiki-hero:has(.wiki-cover-background.image),
+      .cover-content.wiki-hero:has(.wiki-cover-background.image) * {
         --text-banner: #fff !important;
         --text-banner-theme: #fff !important;
       }

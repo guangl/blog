@@ -58,9 +58,12 @@ for (const path of ['index.html', 'posts/index.html', 'about/index.html', 'subsc
   report(existsSync(resolve(output, path)), `Missing required page: ${path}`);
 }
 
-// 首页 Hero 的标题来自 source/_data/wiki/home.yml 的 headline。
+// 首页 Hero 的标题来自 source/_data/wiki/home.yml 的 headline，是否渲染由同一份数据里的
+// hero.enabled 决定（2026-10-17 起关闭，首页直接从正文开始）。
 // 这里从数据文件读期望值，而不是把文案硬编码进自检——否则每次改标题都会误报一次。
-const homeHeadline = ((yaml.load(readFileSync('source/_data/wiki/home.yml', 'utf8')) || {}).headline || '').trim();
+const homeData = yaml.load(readFileSync('source/_data/wiki/home.yml', 'utf8')) || {};
+const homeHeadline = (homeData.headline || '').trim();
+const homeHeroEnabled = homeData.hero?.enabled === true;
 
 const pages = files(output).filter(path => path.endsWith('.html'));
 const articles = [];
@@ -76,9 +79,17 @@ for (const file of pages) {
   // 每个页面都必须带上那段内联脚本，否则备用入口上又会弹出提示并插 noindex。
   report(raw.includes('data-stellar-no-canonical-tip'), `${path}: missing the canonical-notice opt-out script`);
   if (path === 'index.html') {
-    report(Boolean(homeHeadline) && $('.wiki-hero h1').text().trim() === homeHeadline,
-      'Native homepage hero is missing or does not show the configured headline');
-    report($('.wiki-hero a[href="#start"]').length > 0 && $('#start').length === 1, 'Homepage reading anchor is missing');
+    if (homeHeroEnabled) {
+      report(Boolean(homeHeadline) && $('.wiki-hero h1').text().trim() === homeHeadline,
+        'Native homepage hero is missing or does not show the configured headline');
+      report($('.wiki-hero a[href="#start"]').length > 0, 'Homepage reading anchor link is missing');
+    } else {
+      // Hero 关掉时首页必须直接进正文：不能残留 Hero 容器，否则说明配置和数据对不上。
+      report($('.wiki-hero').length === 0,
+        'Homepage still renders the wiki hero although hero.enabled is false');
+    }
+    // 阅读锚点本身两态都要有：Hero 关闭时主题仍会输出它，正文从这里开始。
+    report($('#start').length === 1, 'Homepage reading anchor is missing');
     // `inject.head_end` 里的图标链接与 Hero 对比度遮罩，删了就要在这里报出来
     report($('link[rel="icon"][href="/favicon.ico"]').length === 1, 'Homepage is missing the /favicon.ico icon link');
     report($('link[rel="apple-touch-icon"][href="/apple-touch-icon.png"]').length === 1,
@@ -125,9 +136,19 @@ for (const file of pages) {
     report(Boolean($image.attr('srcset')), `${path}: <picture> img without srcset: ${$image.attr('src')}`);
     report(Boolean($image.attr('width')) && Boolean($image.attr('height')),
       `${path}: <picture> img without width/height: ${$image.attr('src')}`);
-    report($(image).attr('loading') === 'lazy' || $(image).attr('loading') === 'eager',
-      `${path}: <picture> img without native loading: ${$image.attr('src')}`);
+    report($(image).attr('loading') === 'lazy',
+      `${path}: <picture> img is not lazy-loaded: ${$image.attr('src')}`);
     report(!$image.attr('data-src'), `${path}: <picture> img still carries the theme's data-src`);
+  });
+  // 「图片全部懒加载」（2026-10-17）：首页 Hero 的大图去掉之后，站点上没有任何
+  // 需要抢首屏的图，所有 <img> 都必须原生懒加载，包括主题标了 no-lazy 的头像。
+  // data: 占位图除外——那是主题 JS 懒加载的钩子（真地址在 data-src），加原生 lazy
+  // 反而会在 JS 没跑时留下永久占位图。
+  $('img').each((_, image) => {
+    const $image = $(image);
+    if (/^data:/i.test($image.attr('src') || '')) return;
+    report($image.attr('loading') === 'lazy',
+      `${path}: <img> without loading="lazy": ${$image.attr('src')}`);
   });
   // SEO：作者 CDN 的占位图不应出现在页面里（应使用本站 fallbacks.cover / avatar）
   report(!raw.includes('cdn-x/placeholder'), `${path}: references theme author placeholder CDN`);

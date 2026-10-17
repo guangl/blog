@@ -47,7 +47,7 @@ bun run clean
 - 搜索引擎收录支持：站长平台验证 meta、IndexNow 密钥文件、发布后自动推送（见 [SEO 与分享](#seo-与分享)）。
 - 响应式图片：构建期给照片生成 JPEG / WebP / AVIF 多档变体，用 `<picture>` + `srcset` 按屏幕宽度取图（见 [图片](#图片)）。
 - 安全响应头与缓存策略：构建期生成 Cloudflare Pages 的 `_headers`，含 HSTS、CSP、Permissions-Policy（见 [响应头与缓存](#响应头与缓存)）。
-- 无障碍：每页恰好一个 `h1`、每张图都有 `alt`、可缩放的 viewport、「跳到主要内容」链接、首页 Hero 文字对比度 6.27:1（见 [无障碍](#无障碍)）。
+- 无障碍：每页恰好一个 `h1`、每张图都有 `alt`、可缩放的 viewport、「跳到主要内容」链接（见 [无障碍](#无障碍)）。
 - 本地图标（`favicon.ico` 多尺寸 + `apple-touch-icon.png`）与 404 插图；照片提供封面、正文预览图和大图入口。
 - 拍摄参数卡片：文章末尾列出机身 / 镜头 / 焦距 / 光圈 / 快门 / 感光度 / 滤镜 / 时间 / 地点，手写值优先、原图 EXIF 自动补（见 [拍摄参数与相册](#拍摄参数与相册)）。
 - 相册页 `/gallery/`：构建期把全部文章的正文照片按时间从新到旧铺成网格，点开是灯箱大图、点标题进文章（见 [拍摄参数与相册](#拍摄参数与相册)）。
@@ -101,8 +101,9 @@ hankou-river-beach:
 - 浏览器支持 AVIF 就用 AVIF，其次 WebP，最后才回退 JPEG；
 - `<source>` 带 `srcset` + `sizes`，手机不会去下 1600px 的图；
 - `img` 上补了 `width` / `height`，避免图片加载完把正文顶下去（CLS）；
-- 装饰性大图（首页 Hero、文章页头图）改为 `loading="eager"` + `fetchpriority="high"`——它们通常就是 LCP 元素，延后加载只会更慢；
-- 主题自带的懒加载在这里被接管：`.lazy` 类与 `data-src` 会被去掉，改用原生 `loading="lazy"`。原因是 `<picture>` 的 `<source>` 一旦被浏览器选中，再改 `<img src>` 就没用了，两套机制会打架。
+- 图片**一律原生懒加载**（`loading="lazy"` + `decoding="async"`）。2026-10-17 之前 Hero 背景和文章页头图是 `eager` + `fetchpriority="high"`，理由是它们通常是 LCP；现在首页 Hero 整个关掉了，站点上没有值得抢首屏的大图，例外一起删掉。自检会断言每个 `<img>` 都带 `loading="lazy"`（`data:` 占位图除外）。
+- 主题自带的懒加载在这里被接管：`.lazy` 类与 `data-src` 会被去掉，改用原生 `loading="lazy"`。原因是 `<picture>` 的 `<source>` 一旦被浏览器选中，再改 `<img src>` 就没用了，两套机制会打架。主题标了 `no-lazy` 的头像也会补上原生懒加载。
+- 首页 Hero 关闭后，首页只剩 HTML（约 11 KB gzip）+ `main.css`（约 49 KB）+ 几个 JS，不再请求任何照片；那张 1600px 的 Hero 背景（62 KB）是之前最大的单项。
 
 只处理「页面上真的用 `<img>` 显示出来」的图。正文里 `[![…](preview.jpg)](main.jpg)` 的链接目标（`main.jpg`）不生成变体——为一张 7008px 的原图编码 4K AVIF 是纯浪费。实测效果：正文图在手机上从 137KB 降到 9.4KB，列表页封面从 60KB 降到 4KB。
 
@@ -153,15 +154,17 @@ bun run images:compress   # 真正重压（长边 >3840 或 >1.5MB 的 JPEG）
 
 `scripts/a11y.js` 在构建期做五件事，都是实测产物发现的问题：
 
-1. **每页恰好一个 `h1`**。主题在首页会同时输出两个：Hero 大标题和页面标题「欢迎来访」。规则是「保留第一个、其余降级为 `h2`」——首页保留 Hero 大标题，关于 / 订阅 / 组件示例这类只有页面标题的页面不受影响。降级不改外观：主题的标题样式挂在 `.title` 类上，与标签名无关（自检会核对降级后仍是 25px）。
+1. **每页恰好一个 `h1`**。主题在**开启 Hero 时**首页会输出两个：Hero 大标题和页面标题「欢迎来访」；2026-10-17 关掉 Hero 后只剩页面标题一个。规则仍然是「保留第一个、其余降级为 `h2`」，因为把 Hero 加回来时还需要它。降级不改外观：主题的标题样式挂在 `.title` 类上，与标签名无关（自检会核对降级后仍是 25px）。
 2. **列表页补 `h1`**。`/posts/`、`/archives/`、`/categories/*`、`/tags/*` 原本一个 `h1` 都没有。这里按 canonical 路径推一个语义标题（如「标签：武汉」「2026 年 9 月归档」），插在 `<main>` 开头并用 clip 技巧做**视觉隐藏**——不是 `display:none`，那样会被无障碍树忽略，等于没加。
 3. **图片补 `alt`**。卡片封面用同一张卡片里的文章标题；背景类图片（`class` 含 `bg`、位于 `aria-hidden` 容器内）与拿不到标题的一律 `alt=""`（明确表示装饰性，与「完全没有 `alt`」在无障碍树里是两回事）。
 4. **viewport 去掉 `maximum-scale`**。主题在 `layout/_partial/head.ejs` 里写死了 `width=device-width, initial-scale=1, maximum-scale=1`，没有配置项。`maximum-scale=1` 会禁掉双指缩放（Android Chrome 直接生效），WCAG 1.4.4「调整文字大小」不达标——想放大看照片参数的人放不大。现在构建期删掉 `maximum-scale` / `minimum-scale` / `user-scalable` 三个 token，`width` 与 `initial-scale` 原样保留。
-5. **补「跳到主要内容」链接**。主题不提供 skip link，键盘用户每次都要先走完顶栏和 Hero 的四个按钮才到正文（WCAG 2.4.1）。构建期在 `<body>` 之后插入页面里第一个可聚焦元素，指向 `<main id="main">`，并给 `main` 加 `tabindex="-1"`——不加的话部分浏览器只滚动、不移动焦点，屏幕阅读器仍停在原地。样式用「离屏直到聚焦」，不做 `display:none`。
+5. **补「跳到主要内容」链接**。主题不提供 skip link，键盘用户每次都要先走完顶栏导航和侧栏（WCAG 2.4.1）。构建期在 `<body>` 之后插入页面里第一个可聚焦元素，指向 `<main id="main">`，并给 `main` 加 `tabindex="-1"`——不加的话部分浏览器只滚动、不移动焦点，屏幕阅读器仍停在原地。样式用「离屏直到聚焦」，不做 `display:none`。
 
 后两条是 2026-10-17 复查时补的（前三条更早就有了）。`tools/check-site.mjs` 会守住：viewport 不含 `maximum-scale`、每页恰好一个指向 `#main` 的 skip link、`#main` 带 `tabindex="-1"`。
 
-首页 Hero 的**对比度**是单独处理的，见 `_config.stellar.yml` 的 `inject.head_end`。主题只为视频 / 动效英雄加遮罩，图片英雄只有一层「底部渐隐到页面底色」，标题、简介和按钮直接压在照片上；无头 Chrome 实测修之前小字只有 2.56:1（WCAG AA 需要 4.5:1）。现在的做法是在模糊层与渐隐层之间插一层 `rgba(0,0,0,.30)` 遮罩，并把 Hero 文字一律钉成白色（用 `!important` 压过主题 adaptive-text 写在元素上的内联变量，否则换一张照片就可能翻到低对比度那一侧）。修完实测 6.27:1（主按钮反色后 21:1），浅色与深色外观都达标。
+首页 Hero 的**对比度**是单独处理的，见 `_config.stellar.yml` 的 `inject.head_end`。主题只为视频 / 动效英雄加遮罩，图片英雄只有一层「底部渐隐到页面底色」，标题、简介和按钮直接压在照片上；无头 Chrome 实测修之前小字只有 2.56:1（WCAG AA 需要 4.5:1）。做法是在模糊层与渐隐层之间插一层 `rgba(0,0,0,.30)` 遮罩，并把 Hero 文字钉成白色（用 `!important` 压过主题 adaptive-text 写在元素上的内联变量，否则换一张照片就可能翻到低对比度那一侧）。修完实测 6.27:1（主按钮反色后 21:1），浅色与深色外观都达标。
+
+**2026-10-17 起 Hero 整个关闭了**（`source/_data/wiki/home.yml` 的 `hero.enabled: false`，首页直接从正文开始），所以上面这段遮罩样式目前命中不到任何元素，是休眠状态。白色文字那条规则用 `:has()` 限定成「真的存在 `.wiki-cover-background.image` 时才生效」——没有图时 Hero 会用 `var(--background)` + `var(--text)`，浅色主题本来是白底黑字，再钉白就成了白底白字。把 Hero 加回来时这段会自动重新生效，但务必用 `bun run browser:a11y` 复量。
 
 ⚠️ 遮罩保证的是「当前这张照片」。换成天空占比更大、整体更亮的照片时同一层遮罩可能不够，务必重新量一次（见下）。
 
@@ -177,7 +180,7 @@ node tools/browser-check.mjs --shot /tmp/page-{page}.png /   # 顺便存一张�
 
 它做的是纯文本自检做不到的事：把每段压在照片上的文字**先隐藏再截图**、取文字背后区域的平均亮度算真实对比度（标题是大字门槛 3:1，简介和按钮是小字门槛 4.5:1）；统计 `h1` 数量、缺 `alt` 的图、**裂图**（`naturalWidth === 0`）；并回报控制台错误与 **CSP 违规**。它会按 `_headers` 的规则起本地服务，所以能提前验证响应头会不会把站点自己的资源挡掉——MathJax 的公式字形来自 cdnjs，`font-src` 漏一个域名就是一堆豆腐块，这个脚本第一次跑就抓到了这个问题。它需要本机有 Chrome 和 sharp，属于本地工具，不进 CI。
 
-**只量首屏之内的候选文字**（2026-10-17 修）。截图取的是视口，元素坐标落到视口外会被钳到边缘，量到的其实是照片底部那一行像素——首页的面包屑「主页」和「更新于」本来压的是页面底色，却因此被误报成 3.35:1「不足」。压在照片上的文字必然在首屏内（Hero 和文章 banner 都在顶部），跳过的部分会在输出里明确报数，不静默丢弃。
+**只量首屏之内的候选文字**（2026-10-17 修）。截图取的是视口，元素坐标落到视口外会被钳到边缘，量到的其实是照片底部那一行像素——首页的面包屑「主页」和「更新于」本来压的是页面底色，却因此被误报成 3.35:1「不足」。需要压在照片上的文字必然在首屏内（文章 banner 在页面顶部），跳过的部分会在输出里明确报数，不静默丢弃。
 
 ## 响应头与缓存
 
@@ -194,6 +197,8 @@ Cloudflare Pages 的 `_headers` 由 `scripts/cloudflare-headers.js` 在构建期
 3. 一个项目最多 **100 条**规则（现在是 15 条），`tools/check-site.mjs` 会守住这几条约定。
 
 **第二条通道（腾讯云 ECS + Nginx）不认 `_headers` 文件**，安全头是在 `deploy/server-setup.sh` 的 Nginx 模板里另写一遍的（`add_header`）。两处的 CSP 字符串必须逐字符相同，`tools/check-site.mjs` 会直接比对这两份，改一处忘了另一处就会构建失败。Nginx 那边还有两点不同：缓存用 `expires -1` / `expires 30d` 表达同一套意图；HSTS 是**故意没开**的（见脚本里的注释——等 HTTPS 稳定跑一段时间再加），所以大陆通道目前比 Cloudflare 通道少一条 HSTS。
+
+压缩是**单独一份 http 级配置**（`/etc/nginx/conf.d/blog-compression.conf`，由脚本的 `install_compression_conf` 写入），不放在 `server` 块里。原因是 nginx 的 `gzip` 只作用于所在的块及其子块，而本站有三个入口——80 的 IP 默认站点、80 的域名站点、443 的主站点；写在 443 上就只有按域名访问才压缩，备案前唯一能用的 IP 入口会把 388 KB 的 `main.css` 原样发出去。Debian 自带的 `nginx.conf` 里已经有一行 http 级 `gzip on;`（但 `gzip_types` 全是注释，默认只压 HTML），所以脚本先检测它、有就只补参数，避免 `duplicate directive "gzip"` 让 `nginx -t` 失败。细节见 [传输压缩（gzip）](docs/mainland-hosting.md#传输压缩gzip)。
 
 ## 验证与发布
 
@@ -399,11 +404,11 @@ bun run seo:ping       # 推送 IndexNow
 | `photo-index.js` | 上面两个插件共用的「这篇文章有哪些照片」工具 |
 | `sitemap-extras.js` | 图片 sitemap 与 `/posts/`、归档页补进 `sitemap.xml`（见 [搜索引擎收录](#搜索引擎收录)） |
 
-`_config.stellar.yml` 的 `inject.head_end` 负责两件事：图标链接（`favicon.ico` 与 `apple-touch-icon.png`）和首页 Hero 的对比度修正。
+`_config.stellar.yml` 的 `inject.head_end` 负责两件事：图标链接（`favicon.ico` 与 `apple-touch-icon.png`）和首页 Hero 的对比度修正（Hero 现在关着，这段是休眠的，见上文）。
 
-Hero 这段是**纠错后重写的**，值得记一笔：README 原先声称「图片英雄没有遮罩、已通过 `inject.head_end` 补到 3.4:1 / 5.1:1」，但 `git log -S 'inject:' -- _config.stellar.yml` 显示这个配置**从来没有存在过**，它引用的选择器 `.wiki-cover-background-overlay` 在 Stellar 2.0 的图片英雄里也已改写成「底部渐隐到底色」的纯渐变。也就是说这条「已修复」是假的。2026-10-17 用无头 Chrome 重新实测：小字（简介、导航、按钮）2.56:1，大标题 3.6:1。真正修好后的数字是全部 6.27:1（主按钮反色后 21:1），做法是在模糊层与渐隐层之间插一层 `rgba(0,0,0,.30)` 伪元素遮罩，并把 Hero 文字用 `!important` 一律钉成白色。改完记得用 `bun run browser:a11y` 复量。
+Hero 这段是**纠错后重写的**，值得记一笔：README 原先声称「图片英雄没有遮罩、已通过 `inject.head_end` 补到 3.4:1 / 5.1:1」，但 `git log -S 'inject:' -- _config.stellar.yml` 显示这个配置**从来没有存在过**，它引用的选择器 `.wiki-cover-background-overlay` 在 Stellar 2.0 的图片英雄里也已改写成「底部渐隐到底色」的纯渐变。也就是说这条「已修复」是假的。2026-10-17 用无头 Chrome 重新实测：小字（简介、导航、按钮）2.56:1，大标题 3.6:1。真正修好后的数字是全部 6.27:1（主按钮反色后 21:1），做法是在模糊层与渐隐层之间插一层 `rgba(0,0,0,.30)` 伪元素遮罩，并把 Hero 文字用 `!important` 一律钉成白色。**同一天晚些时候 Hero 被整个关掉了**，这段规则随之休眠；把 Hero 加回来时记得用 `bun run browser:a11y` 复量。
 
-`tools/check-site.mjs` 与 `tools/browser-check.mjs` 都只在本地/CI 检查产物，不会发给访客。主题自身仍会加载其 CSS 和 JavaScript。当前沿用主题默认 viewport 设置，包括 `maximum-scale=1`，没有额外改写主题输出。
+`tools/check-site.mjs` 与 `tools/browser-check.mjs` 都只在本地/CI 检查产物，不会发给访客。主题自身仍会加载其 CSS 和 JavaScript；viewport 里的 `maximum-scale` 由 `scripts/a11y.js` 在产物上去掉（见上文[无障碍](#无障碍)）。
 
 `verify` 和 `verify:domain` 都会先执行 `hexo stellar doctor`，再构建并检查站点。迁移参考：[官方 v2 迁移指南](https://xaoxuu.com/wiki/stellar/migration/v1-to-v2/)、[原生 Hero 配置](https://xaoxuu.com/wiki/stellar/guides/wiki/)。
 
