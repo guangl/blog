@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs>
+    <style>
+      .bg { fill: #0f172a; }
+      .box { fill: #1e293b; stroke: #38bdf8; stroke-width: 2; rx: 10; }
+      .box2 { fill: #1e293b; stroke: #a78bfa; stroke-width: 2; rx: 10; }
+      .box3 { fill: #1e293b; stroke: #34d399; stroke-width: 2; rx: 10; }
+      .t { fill: #e2e8f0; font-family: -apple-system, "PingFang SC", sans-serif; font-size: 17px; }
+      .s { fill: #94a3b8; font-family: -apple-system, "PingFang SC", sans-serif; font-size: 13px; }
+      .h { fill: #f8fafc; font-family: -apple-system, "PingFang SC", sans-serif; font-size: 22px; font-weight: 600; }
+      .l { stroke: #64748b; stroke-width: 2; fill: none; marker-end: url(#a); }
+      .l2 { stroke: #34d399; stroke-width: 2; fill: none; marker-end: url(#a); }
+    </style>
+    <marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="960" height="540"/>
+  <text class="h" x="40" y="52">家庭网络：IP 级分流架构</text>
+  <text class="s" x="40" y="78">MAIN 192.168.10.0/24 · UBNT 策略路由 · WireGuard · Surge SOCKS</text>
+
+  <rect class="box" x="40" y="120" width="150" height="64"/>
+  <text class="t" x="62" y="150">客户端</text>
+  <text class="s" x="62" y="170">192.168.10.x</text>
+
+  <rect class="box" x="250" y="120" width="170" height="64"/>
+  <text class="t" x="270" y="150">UDM 策略路由</text>
+  <text class="s" x="270" y="170">按真实目的 IP 分流</text>
+
+  <rect class="box3" x="500" y="120" width="180" height="64"/>
+  <text class="t" x="520" y="150">大陆 IP → WAN1</text>
+  <text class="s" x="520" y="170">直出，不经代理</text>
+
+  <rect class="box2" x="500" y="240" width="180" height="64"/>
+  <text class="t" x="520" y="270">其余 → WG 隧道</text>
+  <text class="s" x="520" y="290">10.66.66.0/24</text>
+
+  <rect class="box" x="740" y="240" width="180" height="64"/>
+  <text class="t" x="760" y="270">NAS 192.168.10.5</text>
+  <text class="s" x="760" y="290">tproxy → Surge SOCKS</text>
+
+  <rect class="box" x="740" y="360" width="180" height="64"/>
+  <text class="t" x="760" y="390">Surge 节点</text>
+  <text class="s" x="760" y="410">出口：香港</text>
+
+  <rect class="box3" x="250" y="360" width="300" height="64"/>
+  <text class="t" x="270" y="390">DNS：AdGuard Home → dnsq</text>
+  <text class="s" x="270" y="410">国内域名表 109,801 条 → 223.5.5.5</text>
+
+  <path class="l" d="M190,152 H245"/>
+  <path class="l" d="M420,140 H495"/>
+  <path class="l" d="M420,165 C460,165 460,272 495,272"/>
+  <path class="l" d="M680,272 H735"/>
+  <path class="l" d="M830,304 V355"/>
+  <path class="l" d="M680,392 H555"/>
+  <path class="l" d="M420,196 C420,300 250,300 250,355"/>
+</svg>
