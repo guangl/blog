@@ -4,7 +4,7 @@ name: Renew mainland server certificate
 #
 # 为什么需要它：腾讯云的「证书自动部署」只覆盖它自家的云产品（CLB / CDN / DNSPod），
 # 管不到 ECS 上自建的 Nginx；免费证书又是 3 个月一到期，手工换很容易忘。
-# 这条工作流把「申请 → 在 Cloudflare 加 DNS 验证记录 → 下载 → 装上服务器 → 重写 Nginx 配置」
+# 这条工作流把「申请 → 按权威 NS 在 Cloudflare / DNSPod 加 DNS 验证记录 → 下载 → 装上服务器 → 重写 Nginx 配置」
 # 整条链路跑完。证书逻辑在 tools/ssl-renew.mjs，安装逻辑在 deploy/install-cert.sh，
 # 配置由 deploy/server-setup.sh 重写（它自带 nginx -t 校验和回滚）。
 #
@@ -13,10 +13,12 @@ name: Renew mainland server certificate
 #
 # Settings → Secrets and variables → Actions：
 #   Variables SERVER_CERT_RENEW = true；可选 SERVER_CERT_THRESHOLD_DAYS（默认 21）
+#             CERT_DNS_PROVIDER = auto（默认，按 NS 选择） / cloudflare / dnspod
 # 手动运行时可以只处理一个域名（inputs.domains，如 blog.guangluo.top），
 # 配合 force 就能单独重签某一个，不浪费另外两个的配额。
 #   Secrets   TENCENT_SECRET_ID / TENCENT_SECRET_KEY（腾讯云 CAM 密钥）
-#             CLOUDFLARE_DNS_TOKEN（Cloudflare Token，权限 Zone → DNS → Edit）
+#             CLOUDFLARE_DNS_TOKEN（仅 Cloudflare DNS 验证需要）
+#             使用 DNSPod 时，腾讯云密钥还需 DescribeDomain/CreateRecord/DeleteRecord 权限。
 #             SERVER_HOST / SERVER_USER / SERVER_SSH_KEY（与发布通道共用）
 #             可选 SERVER_PORT（默认 22）
 #
@@ -43,6 +45,11 @@ on:
         description: 只检查剩余天数，不申请、不改服务器
         type: boolean
         default: false
+      dns_provider:
+        description: DNS 验证提供商（迁移前可选 dnspod 并勾选 check 进行只读预检）
+        type: choice
+        options: [auto, cloudflare, dnspod]
+        default: auto
       domains:
         description: 只处理这几个域名（逗号分隔，默认全部）
         type: string
@@ -71,6 +78,7 @@ jobs:
       TENCENT_SECRET_ID: ${{ secrets.TENCENT_SECRET_ID }}
       TENCENT_SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY }}
       CLOUDFLARE_DNS_TOKEN: ${{ secrets.CLOUDFLARE_DNS_TOKEN }}
+      CERT_DNS_PROVIDER: ${{ inputs.dns_provider || vars.CERT_DNS_PROVIDER || 'auto' }}
       STAGING_PATH: /var/www/cert-staging
     steps:
       - uses: actions/checkout@v7
@@ -89,7 +97,7 @@ jobs:
       - name: Check configuration
         run: |
           missing=0
-          for name in SERVER_HOST SERVER_USER SERVER_SSH_KEY TENCENT_SECRET_ID TENCENT_SECRET_KEY CLOUDFLARE_DNS_TOKEN; do
+          for name in SERVER_HOST SERVER_USER SERVER_SSH_KEY TENCENT_SECRET_ID TENCENT_SECRET_KEY; do
             if [ -z "${!name}" ]; then
               echo "::error::缺少仓库 Secret：$name（见 docs/mainland-hosting.md 的证书一节）"
               missing=1

@@ -14,3 +14,6 @@ source/_data/caches/
 _multiconfig.yml
 # .planning is intentionally tracked for GSD workflow
 
+
+# Local DNS migration snapshots
+.dns-migration/

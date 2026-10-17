@@ -51,17 +51,19 @@ ssh root@<公网IP> 'bash -s' -- --skip-cert < deploy/server-setup.sh
 
 审核电话里网站名称要和备案系统里填的完全一致；用途就说「个人技术学习记录，非经营性，没有评论和注册功能」——本站确实没有接入评论系统。
 
-## 步骤 3：切换解析
+## 步骤 3：配置地域解析
 
-备案通过后，在 Cloudflare 把下面三个名字的 A 记录指向 ECS 公网 IP：
+使用 DNSPod 的线路解析，大陆直连 ECS，其他地区继续访问 Cloudflare Pages。
 
-| 名称 | 类型 | 值 | 代理 |
-| --- | --- | --- | --- |
-| `blog` | A | ECS 公网 IP | **DNS only（灰云）** |
-| `www` | A | ECS 公网 IP | **DNS only（灰云）** |
-| `@` | A | ECS 公网 IP | **DNS only（灰云）** |
+| 主机记录 | 类型 | 线路 | 目标 | 备案通过前 |
+| --- | --- | --- | --- | --- |
+| `blog` | CNAME | 默认 | `guangluo-blog.pages.dev` | 开启 |
+| `blog` | A | 境内 | `82.156.50.189` | 暂停 |
+| `@` | TXT | 默认 | 原 Google 验证值 | 开启 |
 
-橙云代理必须关掉：开着的话备案核查看到的是 Cloudflare 的 IP，会被判定「接入信息与实际不符」，可能被取消接入。
+TTL 为 600 秒。不要复制 Cloudflare 橙云暴露的代理 IP，也不要为 `blog` 添加绕过分流的 AAAA 记录。裸域与 `www` 目前没有网站解析，不为本次迁移新增。
+
+迁移步骤、准确 NS、证书验证与回滚见 [DNSPod 迁移说明](dnspod-migration.md)。备案通过、两端内容与域名 HTTPS 校验正常后，才开启境内 A 记录。切换权威 DNS 和启用大陆入口是两个独立步骤。
 
 ## 步骤 4：签发证书（两条路，选一条）
 
@@ -130,11 +132,13 @@ ssh-copy-id -i ~/.ssh/blog_deploy.pub root@<公网IP>
 这一节只对「步骤 4 选 B」有意义。腾讯云免费证书是 **TrustAsia C1 DV Free：单域名、3 个月**，而且腾讯云的「自动部署」只覆盖它自家的云产品（CLB / CDN / DNSPod），**管不到 ECS 上自建的 Nginx**。所以这条路要么每 3 个月手动换一次，要么交给 `.github/workflows/renew-server-cert.yml`：
 
 ```
-申请（腾讯云 SSL API）→ 写 DNS 验证记录（Cloudflare API）→ 等签发
+申请（腾讯云 SSL API）→ 按权威 NS 写 DNS 验证记录（Cloudflare / DNSPod）→ 等签发
   → 下载并解出 fullchain.pem + privkey.pem
   → rsync 到 ECS 暂存目录 → deploy/install-cert.sh 原子换证书（nginx -t 不过就回滚）
   → 重跑 deploy/server-setup.sh 重写配置 → 对一次线上证书指纹
 ```
+
+DNS 迁移后使用 `CERT_DNS_PROVIDER=auto`（默认）按权威 NS 选择提供商；DNSPod 分支复用腾讯云密钥，另需 `dnspod:DescribeDomain`、`dnspod:CreateRecord`、`dnspod:DeleteRecord` 权限。权限不足时会失败，不会退回旧 Cloudflare 区域。不要在 NS 传播期间强制申请新证书。
 
 分工：证书逻辑在 `tools/ssl-renew.mjs`，安装逻辑在 `deploy/install-cert.sh`，Nginx 配置仍然只由 `deploy/server-setup.sh` 写（它自带的 `nginx -t` 校验和回滚照旧生效）。
 
@@ -152,7 +156,7 @@ ssh-copy-id -i ~/.ssh/blog_deploy.pub root@<公网IP>
 
 - **腾讯云密钥**：访问管理 → 访问密钥 → API 密钥管理。权限最小化可以用子账号 + 自定义策略（只要能调 `ssl:ApplyCertificate`、`ssl:DescribeCertificates`、`ssl:DescribeCertificateDetail`、`ssl:DownloadCertificate`、`ssl:CheckCertificateDomainVerification`），图省事也可以用 `QcloudSSLFullAccess`。
 - **Cloudflare Token**：My Profile → API Tokens → Create Token → Custom token，权限 `Zone → DNS → Edit`，Zone Resources 选 `guangluo.top`。发布通道用的那个 `CLOUDFLARE_API_TOKEN` **没有 DNS 权限**，别拿它顶替（那是故意的：发布不该能改 DNS）。
-- **为什么用 DNS 验证**：域名 NS 在 Cloudflare，DNSPod 的「自动添加记录」用不了；文件验证要求域名已经解析到 ECS（也就是备案之后），而且验证文件还得躲开 `rsync --delete`。DNS 验证两条都不占，**备案通过前就能先把证书拿到手**——这也是选 B 最实际的好处。
+- **为什么用 DNS 验证**：按权威 NS 写 TXT，不要求网站域名已指向 ECS，因此备案通过前也能准备证书；Cloudflare 与 DNSPod 两种托管均支持。
 
 配好后在 Actions 里手动跑一次 **Renew mainland server certificate**（勾上 `force`）。它会申请三张证书（`blog` / `www` / 裸域各一张）、装进服务器，最后打印每张证书的指纹。
 
@@ -181,7 +185,7 @@ curl --resolve blog.guangluo.top:443:<公网IP> https://blog.guangluo.top/
 - `workflow_dispatch` 的四个选项：`force` 不管剩几天都重新申请（想提前换证书时用）；`domains` 只处理指定域名（配合 `force` 单独重签某一个，不浪费配额）；`refresh` 只重写 Nginx 配置、不碰证书（手工改过配置、想让它恢复成脚本生成的样子时用）；`check` 只报告剩余天数，不申请、不碰服务器。
 - 服务器上的证书布局：一个域名一个目录，`/etc/nginx/ssl/<域名>/fullchain.pem` + `privkey.pem`（私钥 600）。Nginx 配置里每个 `server` 块引用自己那份，而且**只在这个块引用的证书真的覆盖该域名时**才生成（看 SAN；letsencrypt 那张证书带三个 SAN，所以备用域名会共用它）——某个备用域名还没证书时，它只在 80 端口做 301，不会让 `nginx -t` 失败，也不会拿一张不对的证书去握手。
 - 换证书是**原子**的：先备份旧目录，写入新文件，跑 `nginx -t`；不通过就把备份拷回来再 `nginx -t`，然后退出非零。备份留在 `/etc/nginx/ssl/.backup/` 里，回滚命令脚本会打印出来。
-- 工作流最后会比对一次线上 443 端口实际发出的证书指纹，**对不上只告警不报红**——备案前域名还指向 Cloudflare Pages，443 上当然是别人的证书。真正的保证在服务器那一侧：`install-cert.sh` 校验域名与私钥、跑过 `nginx -t`，失败会回滚并让 job 变红。等备案切了解析，那一行就会变成「线上证书就是刚装的那一份」；如果那时还告警，说明 Cloudflare 的橙云代理忘了关。
+- 工作流最后会比对一次线上 443 端口实际发出的证书指纹，**对不上只告警不报红**——备案前域名还指向 Cloudflare Pages，443 上当然是别人的证书。真正的保证在服务器那一侧：`install-cert.sh` 校验域名与私钥、跑过 `nginx -t`，失败会回滚并让 job 变红。等备案切了解析，那一行就会变成「线上证书就是刚装的那一份」；地域分流后，本地探测也可能命中 Pages；应使用 `curl --resolve` 直接核对 ECS，不把边缘证书与 ECS 证书不同当成部署失败。
 
 ### 几个要知道的坑
 

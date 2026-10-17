@@ -1,6 +1,6 @@
 # blog.guangluo.top 接入
 
-目标：使用 Cloudflare Pages 托管静态博客，并使用现有 Cloudflare DNS，访问地址为 `https://blog.guangluo.top/`。不接入腾讯云。
+目标：海外由 Cloudflare Pages 托管，大陆在备案通过后直连腾讯云 ECS，统一访问地址为 `https://blog.guangluo.top/`。DNSPod 地域解析迁移步骤见 [迁移说明](dnspod-migration.md)。
 
 > 这是海外通道。大陆主站（腾讯云 ECS + 备案 + Nginx）是后加的，见 [大陆托管与备案](mainland-hosting.md)；两条通道并存，备案通过后大陆访问走 ECS。
 

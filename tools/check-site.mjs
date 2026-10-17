@@ -147,9 +147,20 @@ for (const file of pages) {
   $('img').each((_, image) => {
     const $image = $(image);
     if (/^data:/i.test($image.attr('src') || '')) return;
-    report($image.attr('loading') === 'lazy',
-      `${path}: <img> without loading="lazy": ${$image.attr('src')}`);
+    const firstScreenAvatar = path === 'index.html' && $image.is('[no-lazy]')
+      && $image.attr('src') === '/images/avatar.png';
+    report($image.attr('loading') === (firstScreenAvatar ? 'eager' : 'lazy'),
+      `${path}: incorrect image loading priority: ${$image.attr('src')}`);
   });
+  if (path === 'index.html') {
+    report($('script[src^="/home-assets/core."][defer]').length === 1, 'Homepage core bundle missing');
+    report($('link[rel="stylesheet"][href^="/home-assets/main."]').length === 1, 'Homepage minified CSS missing');
+    report($('.ds-ghinfo, [data-api*="api.github.com"]').length === 0, 'Homepage still requests GitHub API');
+    const runtime = JSON.parse($('#stellar-runtime-config').text());
+    const lazy = runtime.extensions.find(extension => extension.id === 'lazy-loading');
+    report(lazy?.config.asset.startsWith('/home-assets/lazyload.'), 'Homepage lazy loader is not local');
+    report($('link[rel="modulepreload"]').length === 4, 'Homepage runtime preloads missing');
+  }
   // SEO：作者 CDN 的占位图不应出现在页面里（应使用本站 fallbacks.cover / avatar）
   report(!raw.includes('cdn-x/placeholder'), `${path}: references theme author placeholder CDN`);
   // SEO：结构化数据的图片必须是绝对 URL，schema.org 不接受相对路径

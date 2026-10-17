@@ -5,7 +5,7 @@
  * 为什么有这个脚本：腾讯云免费证书（TrustAsia C1 DV Free）是**单域名、3 个月**的，
  * 而且腾讯云的「自动部署」只覆盖它自家的云产品（CLB / CDN / DNSPod），管不到
  * ECS 上自建的 Nginx。所以要么每 3 个月手动换一次证书，要么把这套流程写成脚本。
- * 这个脚本走的是后者：用腾讯云 SSL API 申请、用 Cloudflare API 加 DNS 验证记录、
+ * 这个脚本走的是后者：用腾讯云 SSL API 申请、按权威 NS 选择 Cloudflare / DNSPod 写验证记录、
  * 拿到证书后解出 fullchain.pem + privkey.pem，交给 deploy/install-cert.sh 装。
  *
  * 流程（每个域名一遍）：
@@ -17,11 +17,11 @@
  *      申请新证书时会带上 OldCertificateId，腾讯云会记一条续费关系。
  *   3. DescribeCertificateDetail 取 DV 验证信息（DvAuthKey / DvAuthValue）——只有申请
  *      新证书时才需要这一步。
- *   4. 把 TXT 记录写进 Cloudflare（--zone，默认取域名后两段），
+ *   4. 按权威 NS 将 TXT 写进 Cloudflare 或 DNSPod（--zone，默认取域名后两段），
  *      再用 DNS-over-HTTPS 确认这条记录真的能查到，然后等它签发。
  *   5. DownloadCertificate 拿回一个 base64 的 ZIP，解出证书链和私钥，
  *      写成 <out>/<域名>/fullchain.pem 和 privkey.pem。
- *   6. 收尾时删掉自己加的 TXT 记录（只删带我们自己 comment 的那些，不动别人的）。
+ *   6. 收尾时删掉本次创建的 TXT；Cloudflare 另清理带管理 comment 的历史记录。
  *
  * 用法：
  *   node tools/ssl-renew.mjs                      # 检查 + 需要就续期
@@ -35,7 +35,9 @@
  * 需要的环境变量：
  *   TENCENT_SECRET_ID / TENCENT_SECRET_KEY   腾讯云 CAM 密钥（要能调 SSL 证书接口）
  *   TENCENT_REGION                           可选，默认 ap-guangzhou（SSL 接口不分地域，随便给一个）
- *   CLOUDFLARE_DNS_TOKEN                     Cloudflare Token，权限 Zone → DNS → Edit
+ *   CERT_DNS_PROVIDER                        auto（默认）、cloudflare 或 dnspod
+ *   CLOUDFLARE_DNS_TOKEN                     权威 DNS 是 Cloudflare 时需要，Zone → DNS → Edit
+ *   DNSPod 验证复用上面的腾讯云密钥，需具备 dnspod:DescribeDomain / CreateRecord / DeleteRecord 权限。
  *
  * 退出码：
  *   0  成功（包括「还没到期，跳过」）
@@ -51,6 +53,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
 import tencentcloud from 'tencentcloud-sdk-nodejs-ssl';
+import { validationProvider, createDnsPodValidation } from './lib/dnspod-validation.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -176,8 +179,19 @@ const cfToken = process.env.CLOUDFLARE_DNS_TOKEN || '';
 if (!secretId || !secretKey) {
   die('缺少 TENCENT_SECRET_ID / TENCENT_SECRET_KEY（腾讯云 CAM 密钥）');
 }
-if (!dryRun && !checkOnly && !cfToken) {
-  die('缺少 CLOUDFLARE_DNS_TOKEN（Cloudflare Token，权限 Zone → DNS → Edit）');
+const dnsProvider = process.env.CERT_DNS_PROVIDER || 'auto';
+if (!['auto', 'cloudflare', 'dnspod'].includes(dnsProvider)) die('CERT_DNS_PROVIDER 必须是 auto、cloudflare 或 dnspod');
+let dnsPodValidation;
+async function dnspod() {
+  if (!dnsPodValidation) {
+    const { default: sdk } = await import('tencentcloud-sdk-nodejs-dnspod');
+    const DnsClient = sdk.dnspod.v20210323.Client;
+    dnsPodValidation = createDnsPodValidation(new DnsClient({
+      credential: { secretId, secretKey },
+      profile: { http: { endpoint: 'dnspod.tencentcloudapi.com', timeout: 60 } }
+    }), TXT_COMMENT);
+  }
+  return dnsPodValidation;
 }
 
 const SslClient = tencentcloud.ssl.v20191205.Client;
@@ -402,6 +416,12 @@ const results = [];
 
 /** 申请一张新证书（走 DNS 验证），证书 ID 记进 record；顺带把加的 TXT 记录记进 state 以便收尾删除。 */
 async function renewCertificate({ zone, domain, existing, left, record, state }) {
+  state.provider = await validationProvider(zone, dnsProvider);
+  if (state.provider === 'cloudflare' && !cfToken) throw new Error('缺少 CLOUDFLARE_DNS_TOKEN（当前权威 DNS 为 Cloudflare）');
+  // Check provider credentials before requesting a new certificate.
+  if (state.provider === 'cloudflare') state.zoneId = await cfZoneId(zone);
+  else await (await dnspod()).check(zone);
+
   // 快到期时把旧证书带进申请，让腾讯云记一条续费关系（SDK：有效期 30 天内且未过期才允许）。
   const applyArgs = {
     DomainName: domain,
@@ -421,13 +441,16 @@ async function renewCertificate({ zone, domain, existing, left, record, state })
   if (dv.issued) return;            // 极少数情况下申请完就已经签好了
 
   log(`  验证记录：${dv.authKey} = ${dv.authValue}`);
-  state.zoneId = await cfZoneId(zone);
-  await cfDropStaleTxt(state.zoneId, dv.authKey);
-  state.txtRecordId = await cfAddTxt(state.zoneId, dv.authKey, dv.authValue);
-  log(`  已写入 Cloudflare TXT（记录 ${state.txtRecordId}）`);
+  if (state.provider === 'cloudflare') {
+    await cfDropStaleTxt(state.zoneId, dv.authKey);
+    state.txtRecordId = await cfAddTxt(state.zoneId, dv.authKey, dv.authValue);
+  } else {
+    state.txtRecordId = await (await dnspod()).add(zone, dv.authKey, dv.authValue);
+  }
+  log(`  已写入 ${state.provider} TXT（记录 ${state.txtRecordId}）`);
 
-  // Cloudflare 是权威服务器，记录写进去就该立刻能查到；查不到通常是 Token
-  // 写到了别的区域、或者域名其实不在这个账号下——先把这个坑排掉再等签发。
+  // Provider writes may precede recursive cache expiry; confirm public visibility
+  // before asking the CA to verify. NS changes must finish propagating first.
   let visible = false;
   for (let attempt = 1; attempt <= 10 && !visible; attempt += 1) {
     visible = await txtIsVisible(dv.authKey, dv.authValue);
@@ -452,7 +475,7 @@ async function renewCertificate({ zone, domain, existing, left, record, state })
 async function main() {
   for (const domain of domainList) {
     const zone = zoneFor(domain);
-    log(`\n=== ${domain}（Cloudflare 区域 ${zone}）===`);
+    log(`\n=== ${domain}（DNS 区域 ${zone}，提供商 ${dnsProvider}）===`);
 
     const record = { domain, action: 'renewed', certificateId: null, previousCertificateId: null };
     const state = { zoneId: null, txtRecordId: null };
@@ -467,7 +490,14 @@ async function main() {
       }
 
       if (checkOnly) {
-        results.push({ domain, action: 'check', certificateId: existing?.CertificateId || null, daysLeft: Number(left.toFixed(1)) });
+        const provider = await validationProvider(zone, dnsProvider);
+        if (provider === 'dnspod') await (await dnspod()).check(zone);
+        else {
+          if (!cfToken) throw new Error('缺少 CLOUDFLARE_DNS_TOKEN（只读 DNS 检查需要）');
+          await cfZoneId(zone);
+        }
+        log(`  DNS 提供商 ${provider} 的区域读取正常`);
+        results.push({ domain, action: 'check', dnsProvider: provider, certificateId: existing?.CertificateId || null, daysLeft: Number(left.toFixed(1)) });
         continue;
       }
       if (dryRun) {
@@ -509,7 +539,13 @@ async function main() {
       results.push(record);
     } finally {
       // 验证记录用完就删：留在 DNS 里没有意义，还会让下次申请多一条同名的 TXT。
-      if (state.zoneId && state.txtRecordId) await cfDeleteTxt(state.zoneId, state.txtRecordId);
+      if (state.txtRecordId) {
+        if (state.provider === 'cloudflare') await cfDeleteTxt(state.zoneId, state.txtRecordId);
+        else {
+          try { await (await dnspod()).remove(zone, state.txtRecordId); }
+          catch (error) { warn(`  · 清理 DNSPod TXT 记录失败（记录 ${state.txtRecordId}）：${error.message}`); }
+        }
+      }
     }
   }
 }
