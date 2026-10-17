@@ -17,7 +17,7 @@
   </defs>
   <rect class="bg" width="960" height="540"/>
   <text class="h" x="40" y="52">家庭网络：IP 级分流架构</text>
-  <text class="s" x="40" y="78">MAIN 192.168.10.0/24 · UBNT 策略路由 · WireGuard · Surge SOCKS</text>
+  <text class="s" x="40" y="78">MAIN 192.168.10.0/24 · UBNT 策略路由 · WireGuard · TCP 代理 / 公网 QUIC 回退</text>
 
   <rect class="box" x="40" y="120" width="150" height="64"/>
   <text class="t" x="62" y="150">客户端</text>
@@ -37,11 +37,11 @@
 
   <rect class="box" x="740" y="240" width="180" height="64"/>
   <text class="t" x="760" y="270">NAS 192.168.10.5</text>
-  <text class="s" x="760" y="290">tproxy → Surge SOCKS</text>
+  <text class="s" x="760" y="290">SNI → Surge SOCKS</text>
 
   <rect class="box" x="740" y="360" width="180" height="64"/>
-  <text class="t" x="760" y="390">Surge 节点</text>
-  <text class="s" x="760" y="410">出口：香港</text>
+  <text class="t" x="760" y="390">Surge 策略组</text>
+  <text class="s" x="760" y="410">验证实际出口一致</text>
 
   <rect class="box3" x="250" y="360" width="300" height="64"/>
   <text class="t" x="270" y="390">DNS：AdGuard Home → dnsq</text>
