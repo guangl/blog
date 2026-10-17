@@ -38,6 +38,13 @@ updates:
       # 只挡主版本，4.x 的补丁与次版本照常走上面的分组。
       - dependency-name: "js-yaml"
         update-types: ["version-update:semver-major"]
+      # hexo-generator-feed 4 不再支持自定义模板（feed.template 被忽略），改用 feedsmith 直接生成 Atom：
+      # 版权写死成 "All rights reserved"、条目没有 xml:base、正文也没有 type="html"，
+      # 订阅里的相对图片路径会失效，CC BY 4.0 的署名也丢了（2026-10-18 实测 PR #31）。
+      # 这是本站订阅自检的硬要求，改配置补不回来；等上游恢复模板支持或我们自建生成器再放开。
+      # 只挡主版本，3.x 的补丁与次版本照常走上面的分组。
+      - dependency-name: "hexo-generator-feed"
+        update-types: ["version-update:semver-major"]
 
   # .github/workflows/ 里用到的 action
   - package-ecosystem: github-actions
