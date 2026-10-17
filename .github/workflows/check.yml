@@ -4,6 +4,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  TZ: Asia/Shanghai
+
 permissions:
   contents: read
 
