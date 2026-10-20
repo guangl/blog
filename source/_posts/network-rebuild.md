@@ -1,7 +1,7 @@
 ---
 title: 家庭网络改造实录：用 UBNT 策略路由 + WireGuard + Surge 做 IP 级分流
 date: 2026-10-18 03:10:00
-updated: 2026-10-19 15:29:41
+updated: 2026-10-20 20:24:51
 categories:
   - 网络
 tags:
@@ -124,19 +124,18 @@ DOMAIN-SUFFIX,oaiusercontent.com,🧲 OpenAI,extended-matching
 
 ### 2. 在 NAS 上建立 WireGuard 隧道
 
-这台群晖的 DSM 内核没有 WireGuard 模块，因此 `wg-home` 使用用户态的 `wireguard-go`。镜像基于 Alpine，安装 WireGuard 工具、`wg-quick`、`wireguard-go` 和 iptables。
+这台群晖的 DSM 内核没有 WireGuard 模块，因此 `wg-home` 使用用户态的 `wireguard-go`。镜像基于 Alpine，安装 WireGuard 工具、`wg-quick`、`wireguard-go`、iptables 和单独的 `iptables-legacy` 包。DSM 上使用 legacy 后端；启动脚本也确保 `wg-quick` 的 iptables 钩子指向该后端。
 
 服务端配置放在 `network/wireguard/wg0.conf`，容器内挂载到 `/config`。文件包含私钥和 peer 信息，不提交到仓库。UBNT 作为 WireGuard 客户端连接 NAS 的 UDP `51820`，隧道网段使用 `10.66.66.0/24`。
 
-容器启动脚本依次完成：
+宿主机先由 `/usr/local/etc/rc.d/wg-host-start.sh` 加载 `tun.ko`、创建 `/dev/net/tun`，再等待 Docker 启动目标容器。容器启动脚本依次完成：
 
-1. 开启 `net.ipv4.ip_forward`，允许 NAS 转发 IPv4 流量。
+1. 开启 `net.ipv4.ip_forward`，确认 legacy 后端可用。
 2. 用 `wg-quick` 启动 `wg0`，通过 `wireguard-go` 提供用户态实现。
-3. 加载公网 UDP 443 的限制规则，让隧道内浏览器连接回退到 TCP。
-4. 按 NAS 默认出口网卡添加 MASQUERADE，并配置转发放行规则。
-5. 每 60 秒检查一次接口，接口消失时尝试重建。
+3. 调用统一的 `firewall.sh`，建立 TCP 重定向、QUIC 限制、NAT 和转发规则。
+4. 只有接口和规则都成功才报告就绪；每 60 秒检查并补回缺失规则，失败退出，由重启策略处理。
 
-Compose 还配置了 `wg show wg0` 健康检查，用来判断接口是否存在；它本身不能证明代理上游可用。
+Compose 的 `wg show wg0` 健康检查只能判断接口存在，不能单独证明防火墙规则和代理上游可用。整机重启恢复及客户端测试记录见第五节。
 
 ### 3. 把隧道 TCP 流量交给 Surge
 
@@ -161,7 +160,7 @@ def orig_dst(s):
 
 对公网 TCP 443，程序先读取 TLS ClientHello。能识别 SNI 时，用 SOCKS5 的域名地址类型把目标交给 Surge；识别不到时保留原 IP。握手字节随后原样转发，不解密 HTTPS。这样，Surge 可以对可识别的域名继续应用规则。
 
-这个转发程序只处理 TCP。WireGuard 启动时会调用 `quic-guard.sh`，丢弃从 `wg0` 进入、发往公网的 UDP 443，让浏览器回退到 TCP；`10.0.0.0/8`、`172.16.0.0/12` 和 `192.168.0.0/16` 私网目的地放行。它没有实现通用 UDP 代理，也不能保证识别使用 ECH 的真实域名。
+这个转发程序只处理 TCP。WireGuard 启动时会调用统一的 `firewall.sh`（旧 `quic-guard.sh` 保留为兼容入口），丢弃从 `wg0` 进入、发往公网的 UDP 443，让浏览器回退到 TCP；`10.0.0.0/8`、`172.16.0.0/12` 和 `192.168.0.0/16` 私网目的地放行。它没有实现通用 UDP 代理，也不能保证识别使用 ECH 的真实域名。
 
 ### 4. 配置 DNS 分流与过滤
 
@@ -182,7 +181,7 @@ dnsq 使用从 `felixonmars/dnsmasq-china-list` 整理的约 11 万条国内域�
 
 `filterhost` 把 AdGuard 的本地过滤列表目录挂载到 `/srv`，通过 `127.0.0.1:6213` 提供静态 HTTP 服务。它只是列表来源，不参与 DNS 转发。
 
-UBNT 的 DHCP 配置需要启用自定义 DNS，并下发 NAS 地址。修改后在客户端确认实际收到的 DNS 地址。原部署记录中还在 Mac mini 上运行了一份备用分流解析器，由 DHCP 一并下发；它属于 Mac 侧服务，不在 NAS 的五个容器里。
+UBNT 的 DHCP 配置需要启用自定义 DNS，并下发 NAS 地址。修改后在客户端确认实际收到的 DNS 地址。Mac mini 上还运行一份独立备用分流解析器，由 DHCP 一并下发 `.5` 和 `.4`；它属于 Mac 侧服务，不在 NAS 的五个容器里。两端缓存均按查询内容区分，Apple 联网检测域名使用国内公共 DNS；mini 的国内解析不依赖 NAS，故障切换经过实际离线窗口验证。
 
 ### 5. 配置 UBNT 的策略顺序
 
@@ -211,6 +210,7 @@ homelab/
 │   ├── wireguard/
 │   │   ├── Dockerfile
 │   │   ├── entry.sh
+│   │   ├── firewall.sh
 │   │   ├── quic-guard.sh
 │   │   └── wg0.conf          # 含私钥，不入库
 │   ├── tproxy/
@@ -247,7 +247,7 @@ docker compose --env-file .env -f network/network.yaml logs --tail=100
 4. **代理出口**：对需要统一出口的域名逐一检查公网 IP，再测试浏览器完整登录流程。
 5. **故障行为**：分别停止代理和隧道，检查大陆、内网和境外连接的实际表现。
 
-当前配置下，WireGuard 断开后曾观察到境外流量回落直连，不能把 UBNT 的 kill switch 开关当作断线保护已经生效的证据。TCP 接管和公网 UDP 443 限制也不覆盖所有协议，其他 UDP 和 IPv6 仍需单独验证。启动脚本已做语法检查，但没有通过整台 NAS 重启验证持久化恢复。
+当前配置下，WireGuard 断开后曾观察到境外流量回落直连，不能把 UBNT 的 kill switch 开关当作断线保护已经生效的证据。TCP 接管和公网 UDP 443 限制也不覆盖所有协议，其他 UDP 和 IPv6 仍需单独验证。10 月 20 日已通过整台 NAS 重启验证 TUN、隧道和服务自动恢复；另用重启离线窗口验证国内访问，见第五节。
 
 ### 2. 运行成本与已知限制
 
@@ -263,7 +263,126 @@ docker compose --env-file .env -f network/network.yaml logs --tail=100
 
 因此，这次改造更适合描述为把分流和代理服务集中管理。它改善了日常使用和职责划分，同时增加了服务之间的依赖。后续维护需要同时考虑这些依赖和边界。
 
-## 五、小结
+## 五、重启故障与 NAS 离线降级修复（2026-10-20）
+
+2026 年 10 月 20 日，家里其他设备又出现「国内正常，境外打不开」。常开 mini 自己却能访问 Google，很容易再次怀疑客户端设置。但这次把链路拆开测，问题很快缩到了 NAS：
+
+| 测试路径 | 修复前结果 |
+|---|---|
+| 测试 Mac `.161` → 百度 | HTTP 200 |
+| 测试 Mac `.161` → Google，使用默认路由 | TCP 连接超时 |
+| 测试 Mac `.161` → mini SOCKS `6153` → Google | HTTP 200 |
+| NAS → mini SOCKS `6153` → Google | HTTP 200 |
+| 测试 Mac 对 Google IP 做路由跟踪 | 前两跳为 UDM `.1`、隧道地址 `10.66.66.1` |
+
+所以 Surge 的节点和 SOCKS 服务没有坏，客户端也不需要重新配置代理。能走到隧道地址，只能证明隧道路径可达，不能证明 NAS 已把 TCP 交给 tproxy。
+
+### 真正的问题：防火墙后端不兼容，启动脚本却报成功
+
+NAS 当时的运行时间显示它在凌晨约 02:19 重启过。容器启动日志里反复出现：
+
+```text
+iptables v1.8.13 (nf_tables): Could not fetch rule set generation id: Invalid argument
+[wg] quic-guard 应用失败（继续启动）
+[wg] WireGuard 已就绪（wg0，出口 bond0）
+```
+
+WireGuard 使用 `wireguard-go` 的回退是这台 DSM 的既定方案；这里直接失败的是 iptables 的 nft 后端。旧脚本只有 `set -u`，几条防火墙命令失败后仍继续，最后还打印「已就绪」。`wg show` 能成功的健康检查也检查不到透明转发是否存在。
+
+宿主机运行 `iptables -t nat -nvL PREROUTING` 先报找不到链；容器默认 `iptables` 则报 nft 错误。这两个输出都不能直接拿来判断 legacy 表是否存在。安装单独的 `iptables-legacy` 包后，终于看到了实际的 legacy NAT 表：Docker 规则仍在，但 **PREROUTING 是空的**，没有 `wg0 → 6212` 的重定向。
+
+这次证据支持的结论是：重启后当前生效的透明转发规则缺失，同时启动脚本无法用当前默认后端恢复规则。没有保存重启前的完整规则快照，因此不把所有变化都归因于重启本身。
+
+### 先恢复，再固定启动流程
+
+临时恢复采用独立链 `WG_TPROXY`：
+
+```text
+PREROUTING: -i wg0 -p tcp → WG_TPROXY
+WG_TPROXY:
+  10.0.0.0/8、172.16.0.0/12、192.168.0.0/16 → RETURN
+  其余 TCP → REDIRECT --to-ports 6212
+```
+
+只改隧道入口，不清空 NAT 表，不碰 Docker 已有规则。加回这组规则后，测试 Mac 使用默认网络访问百度、Google、YouTube 和 ChatGPT 的 `/cdn-cgi/trace` 全部返回 HTTP 200。这证明 TCP 透明转发恢复；不等于已经验证浏览器 QUIC 路径或完整 OAuth 登录。
+
+持久化修复包放在 NAS 的 `network/wg-fix-20261020/`，由 `deploy.sh` 部署到 `network/wireguard/`。改动包含：
+
+- Dockerfile 明确安装 `iptables-legacy`，在 PATH 前部提供指向 legacy 的 `iptables`，使 `wg-quick` 的钩子也使用同一后端。
+- 新增 `firewall.sh`，统一管理透明 TCP 重定向、隧道 NAT、原有转发放行及公网 UDP 443 防绕路规则。使用 `-C` 检查后再添加，重复执行不堆叠规则。
+- QUIC 拦截放在 FORWARD 的首条，先于已有的 `wg0 ACCEPT`；私网目的地仍返回原有转发流程。否则规则虽然存在，也可能永远命不中。
+- `entry.sh` 在接口与规则都成功后才报告就绪；每 60 秒检查接口并补回缺失规则，修复失败就退出，交给容器重启策略处理。
+- 旧 `quic-guard.sh` 改为调用统一规则脚本，避免维护两份实现。
+
+部署脚本先备份旧文件和 legacy 规则，构建候选镜像成功后再替换，只重建 `wg-home`，不重启 NAS 或其他业务容器。它不会自动清空或恢复整张防火墙表。
+
+**验证状态：** 管理员已执行部署，NAS 上已落地新 Dockerfile、启动脚本、统一规则脚本及备份（`backup-20261020-070816`）。部署后从另一台 Mac `.161` 使用默认网络复测，百度、Google、YouTube 和 ChatGPT 的 `/cdn-cgi/trace` 均返回 HTTP 200；ChatGPT trace 显示 `loc=JP`、HTTP/2、TLS 1.3。这支持部署后 TCP 路径仍然正常。管理员随后执行了连续两次规则应用命令，提供的日志末尾显示 `WireGuard 与透明转发、QUIC 规则已就绪（legacy）`；`WG_QUIC_GUARD` 显示 1 个引用，三个私网放行规则及一条 DROP，DROP 已命中 6 个包、7498 字节。这证明新容器完成了接口与规则初始化，并且 QUIC 保护已有实际命中。回传内容未包含完整 PREROUTING/FORWARD 列表，因此不把所有链的无重复性写成已逐条核验。此阶段尚未重启整台 NAS；随后完成的重启测试见下一节。完整浏览器登录没有在本轮重测。
+
+### 整机重启测试又暴露了一层：宿主机 TUN 没有持久化
+
+随后实际重启整台 NAS。SSH 曾离线，恢复后的 boot ID 与之前不同，运行时间也从约五小时归零，确认经历了整机重启。DNS、dnsq 和 tproxy 陆续自动恢复，但 WireGuard 的 UDP 51820 没有出现；测试 Mac 访问 Google 再次超时。
+
+继续检查发现：`/dev/net` 整个目录不存在，`/proc/modules` 中没有 `tun`，而 NAS 自带 `/lib/modules/tun.ko` 文件。容器内脚本能够恢复 iptables，并不代表它可以恢复宿主机缺失的 TUN 前置条件。
+
+补充修复包新增 `wg-host-start.sh`，由管理员安装到 DSM 的 `/usr/local/etc/rc.d/`：先加载宿主机自带的 `tun.ko`，再以设备号 `10:200` 创建 `/dev/net/tun`；后台等待 Docker 和目标容器可用，再启动 `wg-home` 并检查接口与规则。等待最多十分钟，成功和超时均写入系统日志。旧的 `wg-redirect.sh` 开机脚本备份停用，防火墙恢复统一交给容器，避免宿主机与容器两处重复维护。
+
+**当前验证状态：** 管理员已安装补充启动钩子。执行后实测 `tun` 模块加载成功，`/dev/net/tun` 为 `10:200` 字符设备，WireGuard 的 UDP 51820 恢复监听。测试 Mac `.161` 经默认网络访问百度、Google、YouTube 和 ChatGPT trace 全部 HTTP 200，ChatGPT trace 为 JP、HTTP/2、TLS 1.3。这证明脚本在当前系统上能恢复完整链路；随后进行了第二次整机重启，boot ID 再次变化。开机约两分钟时，TUN 模块、`10:200` 设备、WireGuard UDP 51820、tproxy TCP 6212、dnsq UDP 6210 和 DNS 53 端口均自动恢复，没有手动启动服务，验证了开机钩子实际执行。第二轮测试中，测试 Mac 的 DHCP 地址已由 `.161` 变成 `.108`。确认新地址后，实测默认网关仍为 UDM `192.168.10.1`，未设置单独代理，百度、Google、YouTube 和 ChatGPT trace 均 HTTP 200，耗时约 0.13、0.31、0.49、0.48 秒；ChatGPT trace 为 JP、HTTP/2、TLS 1.3。至此，补充 TUN 启动钩子后的整机重启、服务自动恢复及客户端默认网络 TCP 访问验证通过。OpenAI 策略组保留原有日本节点选择，这不是默认香港策略被重启改动；完整浏览器 OAuth 登录仍未在此轮重测。此前容器状态为 `Exited (137)`，这个退出码本身不能证明是 OOM，也不能单独证明容器启动失败原因。
+
+### NAS 离线时国内仍可用：备用 DNS 也要实测
+
+重启恢复不等于 NAS 离线时国内上网可用。用户随后反馈，NAS 停机时 iPhone 在 `1401` 显示「无互联网连接」，因此补做故障降级检查。
+
+先在测试 Mac 验证百度的国内 IP 路径：首跳为 UDM `.1`，后续进入运营商地址，HTTPS 返回 200，未看到它经 WireGuard 的第二跳。再查备用 DNS `.4`，却发现 `captive.apple.com` 的 A 查询收到 TYPE65 问题区，`dig` 报 `Question section mismatch` 并超时。Mac 上的 dnsq 仍是按域名缓存的旧版，NAS 修复过的查询类型隔离并没有同步到它。旧 `dns-ha` 脚本还引用废弃的 `.15` 网段，而且当前未加载。
+
+本次把 mini 的 dnsq 缓存改为按完整查询区分、校验上游问题区并遵守 TTL；Apple 联网检测域名使用公共 DNS，避免依赖 NAS 或代理上游。部署前先在临时端口测试，随后管理员安装正式版本、重启 dnsq，并备份停用旧的 DNS 切换任务。正式 `.4:53` 的 A、AAAA、TYPE65 混合查询通过，测试 Mac 的 Apple 联网检测页返回 `Success`。
+
+客户端此时仍拿到 NAS `.5` 和 mini `.4` 两个 DNS。这只能证明备用服务当前可用，不能证明手机会及时故障切换。用户选择再次重启 NAS 来提供离线窗口，避免关机后无法远程开机。在 NAS DNS 已超时、随后 SSH 也完全无法连接时，测试 Mac `.108` 使用默认网络访问京东、淘宝、哔哩哔哩和工行官网全部 HTTP 200，耗时约 0.09–0.19 秒；用户同时确认连接 `1401` 的手机国内 App 可以使用。这验证了本轮 NAS 离线窗口内国内上网可用，但没有测试无限期停机或每一种国内 App。
+
+仍有一项联网检测细节：停机前 NAS 对 `captive.apple.com` 返回 `17.253.199.x`，Mac 备用 DNS 返回国内 CDN 地址。客户端用先前的系统解析结果访问检测页超时，显式指定备用 DNS 返回的国内地址则立即得到 HTTP 200 和 `Success`。因此国内 App 能用，不等于 iOS 的提示一定即时消失。NAS 端随后也加入相同的检测域名国内解析规则。安装时 dnsq 容器尚未随 NAS 启动，脚本在文件更新后报“容器未运行”；等待容器自动启动后，新规则已生效。再次分别查询 `.5` 和 `.4`，均得到国内 CDN 地址；按各自返回的地址请求检测页，均为 HTTP 200 和 `Success`。安装脚本也补上先启动 dnsq 再检查的步骤，避免同类时序报错。客户端可能仍保留先前的海外地址缓存，系统直接访问曾显示旧 IP，因此需要等待 TTL 或重新连接后复核手机提示；不把新 DNS 回答等同于所有客户端缓存已清除。手机本次回报仅为“可以使用”，不据此声称“无互联网连接”提示已消失。
+
+### 最终配置与验收结果（2026-10-20）
+
+这次最后补齐的是两个目标：**NAS 重启后代理链路自动恢复；NAS 离线时国内仍能正常上网。** 前者依赖宿主机 TUN 初始化和容器防火墙恢复，后者依赖 UDM 国内直连和独立于 NAS 的备用 DNS。
+
+| 问题 | 最终处理 | 验证结果 |
+|---|---|---|
+| nft 后端与当前 DSM 不兼容 | 镜像安装 legacy，并让 wg-quick 的 iptables 钩子使用同一后端 | 新容器日志显示 legacy 规则就绪 |
+| TCP 重定向未恢复 | firewall.sh 统一管理 WG_TPROXY，启动及每 60 秒检查补回 | 默认网络访问 Google、YouTube、ChatGPT trace 为 200 |
+| QUIC 绕过 TCP 接管 | 私网放行，公网 UDP 443 在通用 ACCEPT 前丢弃 | DROP 已命中 6 包、7498 字节 |
+| 防火墙失败仍报告成功 | 接口与规则成功才报告就绪，失败退出 | 正常启动通过，未逐项注入所有失败分支 |
+| 整机重启丢失 TUN | DSM 开机钩子加载 tun.ko、创建设备并等待 Docker 启动隧道 | 再次整机重启后，无人工启动，服务自动恢复 |
+| mini DNS 混淆查询类型 | 完整查询缓存键、问题区校验、TTL 递减与到期 | A、AAAA、TYPE65 混合查询通过 |
+| 旧 DNS 切换任务仍引用废弃网段 | 备份停用旧任务，国内解析独立使用公共 DNS | NAS 离线窗口内国内网站及手机 App 可用 |
+| 主备 DNS 的联网检测走不同路径 | 两端检测域名统一使用国内公共 DNS 解析 | 分别按两端解析结果访问，均为 200 / Success |
+| 安装时容器未运行 | 配置先落盘，容器启动后加载；安装脚本补上先启动再检查 | 等待 dnsq 自动启动后，新规则生效 |
+
+最终需要保留的运行文件如下，不能只修改当前容器：
+
+```text
+NAS /volume1/docker/homelab/network/wireguard/
+  Dockerfile       安装 legacy 后端
+  entry.sh         启动检查、每 60 秒补回规则
+  firewall.sh      TCP、QUIC、NAT、转发规则统一入口
+  quic-guard.sh    兼容入口，调用 firewall.sh
+NAS /usr/local/etc/rc.d/wg-host-start.sh
+                   加载 TUN，等待 Docker 并启动隧道
+NAS /volume1/docker/homelab/network/dnsq/dnsq.py
+                   联网检测域名走国内解析
+mini /usr/local/etc/dnsq/dnsq.py
+                   独立备用 DNS，修复缓存与检测域名解析
+```
+
+旧容器脚本、镜像标识和规则快照保留在 NAS 的 `wireguard/backup-*`；旧宿主机钩子也已备份停用。mini 的旧 dnsq 和旧 DNS 切换任务保留在它自己的 `backup-*` 目录。避免同时由宿主机和容器维护两套透明转发规则。
+
+最后一次检查约在 07:38：NAS 已运行约五分钟，TUN、WireGuard、DNS、dnsq 和 tproxy 均恢复；测试 Mac `.108` 经默认网络访问百度约 0.13 秒、Google 约 0.26 秒、Apple 联网检测页约 0.13 秒，全部 HTTP 200。停机窗口中，京东、淘宝、哔哩哔哩、工行官网及手机国内 App 可用也分别得到验证。
+
+另外澄清两个容易误判的现象：ChatGPT trace 为 JP，是原有 OpenAI 策略组选日本节点的结果，本次没有把默认香港策略改成日本，也没有测定所有网站的真实出口。macOS 的“Personal Hotspot Available”是热点邀请，仅凭通知不能认定 Wi-Fi 断网；它出现于重启窗口，但具体触发原因没有验证。后续以实际访问和联网检测结果判断，不通过关闭通知代替修复。
+
+本轮没有重测完整 OAuth 登录、每一种 App、无限期 NAS 故障或所有 UDP/IPv6 路径。手机只确认了国内 App 可用，没有单独确认旧“无互联网连接”提示立即消失；不能把这些未完成项目写成已通过。
+
+参考：[Alpine 3.22 的 iptables-legacy 包](https://pkgs.alpinelinux.org/package/v3.22/main/x86_64/iptables-legacy)。
+
+## 六、小结
 
 这套网络由 UBNT、NAS 和 Mac mini 分工完成：UBNT 做 IP 分流，NAS 上五个容器负责隧道、TCP 转发、DNS 与过滤列表，Surge 提供代理出口。日常客户端继续使用普通 DHCP 配置，网络服务集中在常开设备上管理。
 
