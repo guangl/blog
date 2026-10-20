@@ -6,8 +6,8 @@ topbar:
     image:
       src: /images/avatar.png
       variant: icon
-    name: "个人摄影学习之路"
-    tagline: "摄影 · 练习 · 记录"
+    name: "光影之间"
+    tagline: "摄影 · 阅读 · 生活"
     href: /
   menu:
     - id: post
@@ -40,8 +40,8 @@ leftbar:
     image:
       src: /images/avatar.png
       variant: icon
-    name: "个人摄影学习之路"
-    tagline: "摄影 · 练习 · 记录"
+    name: "光影之间"
+    tagline: "摄影 · 阅读 · 生活"
     href: /
     search: true
   # 导航已在顶部栏，左侧栏不再重复；Wiki 页面会用文档树替换这里的内容。
@@ -102,7 +102,7 @@ profiles:
     rightbar:
       widgets: [toc]
   # 专栏（topic）与笔记本（notebooks）两套栏目已随内容一起移除（2026-10-17）：
-  # 站点只保留摄影内容，_posts/ 与归档、分类、标签足够承载。
+  # 站点以摄影为主，兼有阅读与技术记录，_posts/ 与归档、分类、标签足够承载。
   # 需要时按 Stellar 官方文档把这两段配置和对应的 _data 文件加回来即可。
   wiki_index:
     path: null

@@ -1,7 +1,7 @@
-name: "个人摄影学习之路"
+name: "光影之间"
 headline: 把每一次快门都当作练习。
-tagline: 摄影 · 练习 · 记录
-description: 记录摄影练习的过程，也整理家庭网络搭建和日常使用中的实践。
+tagline: 摄影 · 阅读 · 生活
+description: 以影像留住日常，也分享读书笔记、家庭网络与 DBA 实践。
 # 右栏仓库卡片（ghrepo）读取这里。
 source:
   repository: guangl/blog
