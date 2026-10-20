@@ -48,7 +48,7 @@ function beianFooterLine() {
   const icp = trimmed(beian.icp);
   const police = trimmed(beian.police);
 
-  if (icp) links.push(beianLink(icp, MIIT_URL));
+  if (icp) links.push(`ICP 备案：${beianLink(icp, MIIT_URL)}`);
   if (police) links.push(beianLink(police, trimmed(beian.police_url) || POLICE_URL));
   return links.length > 0 ? `<p>${links.join(" ")}</p>` : "";
 }
