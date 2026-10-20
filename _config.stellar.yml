@@ -167,7 +167,6 @@ footer:
         - "[站点地图](/sitemap.xml)"
   content: |
     © 2026 [{author.name}](/about/)。文章与图片采用 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可协议，另有声明的内容除外。
-    使用 [Hexo](https://hexo.io/) 与 [{theme.name} {theme.version}]({theme.tree}) 构建。
 
 features:
   color_scheme_switch:
