@@ -145,9 +145,9 @@ beian:
   # ICP 备案号，例如 鄂ICP备2026000000号-1；页脚会链接到工信部备案系统
   icp: "鄂ICP备2026059681号-1"
   # 公安联网备案号，例如 鄂公网安备42010000000000号；留空则不输出
-  police: ""
+  police: "鄂公网安备42011202002819号"
   # 公安备案号的链接，留空时用全国互联网安全管理服务平台
-  police_url: ""
+  police_url: "https://beian.mps.gov.cn/#/query/webSearch?code=42011202002819"
 
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment
