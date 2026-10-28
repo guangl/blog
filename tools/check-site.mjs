@@ -14,6 +14,21 @@ const site = new URL(config.url.replace(/\/?$/, '/'));
 const errors = [];
 const report = (condition, message) => { if (!condition) errors.push(message); };
 
+// 站点兜底图（_config.stellar.yml 的 fallbacks.cover / avatar）不是「文章配图」：
+// 主题会给每篇文章的 JSON-LD 补一张兜底社交卡片，纯文字文章因此也会声明
+// /images/cover.jpg。若把这种兜底图当作文章图片要求进图片 sitemap，
+// 所有不配图的文章都会被判失败（2026-10-28 引入 iA Writer 笔记同步时暴露）。
+// 这里按配置读出兜底图 URL，比较时把它们排除，检查口径回到「文章自己带的图」。
+const fallbackImages = new Set();
+const stellarConfigPath = resolve(process.env.STELLAR_CONFIG || '_config.stellar.yml');
+if (existsSync(stellarConfigPath)) {
+  const stellarConfig = yaml.load(readFileSync(stellarConfigPath, 'utf8')) || {};
+  for (const key of ['cover', 'avatar']) {
+    const value = stellarConfig.fallbacks && stellarConfig.fallbacks[key];
+    if (typeof value === 'string' && value.trim()) fallbackImages.add(new URL(value, site).href);
+  }
+}
+
 function files(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
     const path = resolve(dir, entry.name);
@@ -252,7 +267,8 @@ for (const image of sitemapImageUrls) {
 for (const article of articles) {
   const declared = (Array.isArray(article.image) ? article.image : [article.image])
     .map(entry => (typeof entry === 'string' ? entry : entry && entry.url))
-    .filter(value => typeof value === 'string' && value.length > 0);
+    .filter(value => typeof value === 'string' && value.length > 0)
+    .filter(value => !fallbackImages.has(new URL(value, site).href));
   if (declared.length === 0) continue;
   report(declared.some(image => sitemapImageUrls.includes(image)),
     `Article missing from the image sitemap: ${article.headline}`);

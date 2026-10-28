@@ -1,0 +1,31 @@
+# iA Writer 笔记同步配置（tools/ia-writer-sync.mjs）
+#
+# 笔记里出现 #blog 这个标记时才会被同步成博客文章；没有标记的笔记永远只留在本地。
+# 标记可以单独占一行（#blog），也可以写在正文任意位置，同步时会从正文里去掉。
+
+# iA Writer 的库目录。iCloud 库的路径可以从 iA Writer「库 → 显示简介」里看到，
+# 或者在 Finder 里进入 iCloud Drive → iA Writer。可以写多个。
+libraries:
+  - ~/Library/Mobile Documents/27N4MQEA55~pro~writer/Documents
+
+# 触发发布的标记
+publish_tag: blog
+
+# 笔记没写 categories 时归到这个分类
+default_category: 随记
+
+# 文章 AI 成分标签：manual（人类完成）/ reviewed（已 AI 审核）/ polished（已 AI 润色）/ generated（AI 生成）
+default_ai_label: manual
+
+# 文件名（= 文章 slug / URL）的生成方式：
+#   pinyin  中文转拼音，例如 晨跑笔记 → chen-pao-bi-ji
+#   title   保留原文，例如 /posts/晨跑笔记/
+#   hash    note-20261028-0930-ab12cd34ef56
+# 也可以在笔记 front-matter 里用 slug: my-own-slug 单篇指定。
+slug_mode: pinyin
+
+# 正文第一张图自动作为 cover（列表页封面）
+auto_cover: true
+
+# 单篇文章最多保留多少个标签
+max_tags: 8

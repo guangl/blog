@@ -77,6 +77,26 @@ cover: /2026/10/16/文章标题/cover.jpg
 
 站点时区为 `Asia/Shanghai`；未来日期的内容不会提前发布（`future: false`），日期写到明天就会「生成了但产物里没有」，排查时先看这个。修改文章时手动更新 `updated`，避免每次部署把旧文章误标为刚刚更新。
 
+### 从 iA Writer 同步笔记
+
+手机上用 iA Writer 写，正文里加一行 `#blog` 就能变成文章：
+
+```bash
+bun run notes:list   # 预演：哪些笔记会发、写成什么 slug，不写文件
+bun run notes:sync   # 写入 source/_posts/ 并构建自检（不 commit、不部署）
+```
+
+没有 `#blog` 的笔记永远只留在 iA Writer 里（私人笔记不加标记就绝对安全）。标题取第一个 H1，标签取 `#标签` 行，中文标题转拼音当 slug，`updated` 跟着笔记的最后修改时间走。规则、front-matter 透传、状态文件与排错见 [`docs/ia-writer-sync.md`](docs/ia-writer-sync.md)，配置在 [`ia-writer.yml`](ia-writer.yml)。
+
+图片从笔记同目录复制进文章资源目录，文件名统一成 `<slug>-1.jpg`、`<slug>-2.png`……按正文出现顺序编号：
+
+- 相机的 `IMG_4821.HEIC`、手机的「截屏 2026-10-28 下午4.32.11.png」这类名字带空格和中文，进 URL 要编码、在文件管理器里也没法排序，所以一律重编；`.jpeg` / `.jpe` 统一成 `.jpg`，扩展名一律小写。
+- 同一张图在正文引用两次只复制一份、共用一个名字；子目录里的图会被拉平到文章资源目录，不会丢，靠编号区分。
+- 正文里的 `![]()` 引用跟着改名，`cover` 用新的第一张图。图片要在 slug 定下来之后才编号，所以改标题或改 `slug` 时资源名会一起变——旧文章和旧资源目录会被挪走，`date` 保持不变，输出里标黄色「改名」，不会在 `source/_posts/` 留下孤儿。
+- `.heic` / `.heif` / `.tif` / `.tiff` 同步时自动转成 JPEG（HEIC 只有 Safari 认、TIFF 谁都不认）：TIFF 走 sharp，HEIC/HEIF 走 macOS 自带的 `sips`，再用 sharp 收尾——长边封顶 3840、按 EXIF 摆正方向、q90 渐进式、不留任何元数据（GPS 不进 Git）。转换失败才提示手动导出。
+- 仓库里的主图只用 JPEG 或 PNG：构建管线（[`scripts/image-pipeline.js`](scripts/image-pipeline.js)）只认这两种，AVIF/WebP 那些更小的格式是它在构建时按 480/960/1600 等档生成的（写进产物、不进仓库）。把 AVIF 直接存进 `source/` 等于既没有变体也没有兜底，还多一次有损。所以照片转 JPEG，截图/线稿/带透明的图用 PNG——带 alpha 的 TIFF 转 JPEG 会把透明压成黑底，工具会单独提示改存 PNG。
+- 纯图片笔记没有正文可摘时，`description` 用图片的 `alt` 兜底（去重后最多 3 条），否则每页必需的 meta description 会是空的，`bun run check` 直接失败。
+
 拍摄参数**不写在 front-matter 里**：Stellar 2.0 的 front-matter schema 是封闭的，多一个 `photo:` 会被判成未知字段丢掉、并每次构建告警一行。写在 [`source/_data/photos.yml`](source/_data/photos.yml)，键是文章文件名（slug）：
 
 ```yaml
@@ -258,6 +278,8 @@ node tools/audit-live.mjs --base http://127.0.0.1:4001/   # 换目标（比如�
 | 安全响应头与缓存策略 | `scripts/cloudflare-headers.js` |
 | `h1` / `alt` / skip link 等无障碍修正 | `scripts/a11y.js` |
 | 图标文件生成 | `tools/make-favicon.mjs` |
+| iA Writer 笔记库、发布标记与 slug 规则 | `ia-writer.yml` |
+| 笔记转文章的实现与排错 | `tools/ia-writer-sync.mjs`、`docs/ia-writer-sync.md` |
 | 产物自检的硬约束 | `tools/check-site.mjs` |
 | 对比度 / 裂图 / CSP 实测 | `tools/browser-check.mjs` |
 | 线上体检的检查项与判定规则 | `tools/audit-live.mjs`、`docs/site-audit.md` |
