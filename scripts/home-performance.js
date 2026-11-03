@@ -17,6 +17,29 @@ hexo.extend.filter.register('after_generate', async () => {
     return Buffer.concat(chunks).toString('utf8');
   };
   const $ = load(await readRoute('index.html'), { decodeEntities: false });
+  // Use generated post routes so drafts, future and excluded posts stay hidden.
+  const escapeHtml = value => String(value || '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+  const posts = hexo.locals.get('posts').toArray()
+    .filter(post => post.published !== false && hexo.route.get(post.path))
+    .sort((a, b) => Number(b.updated || b.date) - Number(a.updated || a.date)
+      || Number(b.date) - Number(a.date))
+    .slice(0, 6);
+  const recent = '<ul class="home-recent-posts">' + posts.map(post => {
+    const date = post.updated || post.date;
+    const stamp = date.tz(hexo.config.timezone || 'Asia/Shanghai').format('YYYY-MM-DD');
+    return `<li><a href="${escapeHtml(hexo.extend.helper.get('url_for').call(hexo, post.path))}">${escapeHtml(post.title)}</a>`
+      + ` <small>更新于 <time datetime="${stamp}">${stamp}</time></small>`
+      + (post.description ? `<p>${escapeHtml(post.description)}</p>` : '') + '</li>';
+  }).join('') + '</ul>';
+  const replaceMarker = node => {
+    for (const child of [...(node.children || [])]) {
+      if (child.type === 'comment' && child.data.trim() === 'home-recent-posts') $(child).replaceWith(recent);
+      else replaceMarker(child);
+    }
+  };
+  replaceMarker($.root()[0]);
   const emit = (name, content, loader) => {
     const code = transformSync(content, { loader, minify: true, target: 'es2020', legalComments: 'eof' }).code;
     const hash = crypto.createHash('sha256').update(code).digest('hex').slice(0, 16);
