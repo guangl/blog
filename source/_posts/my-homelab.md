@@ -1,7 +1,7 @@
 ---
 title: 我的 Homelab：NAS、Mac mini 的配置、分工与取舍
 date: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-06
 categories:
   - Homelab
 tags:
@@ -15,11 +15,11 @@ article:
   ai_label: generated
 ---
 
-家里的 Homelab 主要围绕群晖 NAS、Mac mini 和 UniFi 网络搭建。NAS 保存数据并运行大部分应用，Mac mini 运行 Surge、反向代理和相册的机器学习服务，UniFi 负责家庭网络的网关与路由。
+家里的 Homelab 主要围绕群晖 NAS、Mac mini 和 UniFi 网络搭建。NAS 保存数据并运行大部分应用，Mac mini 运行 DNS、sing-box、Surge、反向代理和相册的机器学习服务，UniFi 负责家庭网络的网关与路由。
 
 最初只是想把几个服务跑起来。服务逐渐增加以后，需要考虑的问题也变多了：照片交给谁保存，计算任务放在哪里，域名怎么指向应用，下载是否经过代理，以及一台设备重启时会影响什么。
 
-这篇把这些配置和取舍一起记下来。部署清单依据配置仓库在 **2026 年 11 月 3 日对照 NAS、Mac mini 和反向代理更新的记录**。本文根据这次实机核验后导出的 `deploy/` 和 `templates/runtime/` 配置更新；这是配置快照及其取舍说明，不代表本文又执行了一次重启或故障验收。
+这篇把这些配置和取舍一起记下来。部署清单依据配置仓库在 **2026 年 11 月 3 日对照 NAS、Mac mini 和反向代理更新的记录**。本文根据这次实机核验后导出的 `deploy/` 和 `templates/runtime/` 配置更新；网络部分已在 11 月 6 日根据两台主机的实机只读核对更新；其余应用与恢复清单保留 11 月 3 日快照口径，不代表本轮重新验收全部应用。
 
 <!-- more -->
 
@@ -32,11 +32,11 @@ article:
 | 设备或服务 | 地址 | 职责 |
 | --- | --- | --- |
 | UniFi / UDM | `192.168.10.1` | 默认网关与家庭网络路由 |
-| Mac mini | `192.168.10.4` | Surge、Nginx Proxy Manager、Immich 机器学习 |
-| 群晖 NAS | `192.168.10.5` | 存储、主要应用、DNS、网关容器、监控与通知 |
+| Mac mini | `192.168.10.4` | DNS、sing-box、Surge、Nginx Proxy Manager、Immich 机器学习 |
+| 群晖 NAS | `192.168.10.5` | 存储、主要应用、监控与通知 |
 | qBittorrent | `192.168.10.6:8080` | 使用独立局域网地址的下载服务 |
 
-NAS 当前部署记录中有 17 个运行容器，Mac mini 有 2 个。数据库、缓存、通知等后台组件也计算在内，所以容器数量不等于应用入口数量。
+11 月 3 日快照中 NAS 有 17 个运行容器、Mac mini 有 2 个。11 月 6 日 Mac mini 已有 4 个容器，sing-box 另以原生进程运行；旧数量不再代表当前部署。数据库、缓存、通知等后台组件也计算在内，所以容器数量不等于应用入口数量。
 
 按功能看，主要分成几组：
 
@@ -45,7 +45,7 @@ NAS 当前部署记录中有 17 个运行容器，Mac mini 有 2 个。数据库
 | 影音与下载 | Emby、Ani-RSS、qBittorrent、Sublarr | NAS |
 | 相册 | Immich Server、数据库、Redis | NAS |
 | 相册机器学习 | Immich Machine Learning | Mac mini |
-| 网络 | AdGuard Home、SmartDNS、Sing-box 网关、AutoSSH 隧道 | NAS |
+| DNS 与出网处理 | AdGuard Home、SmartDNS、原生 sing-box | Mac mini |
 | 代理与反向代理 | Surge、Nginx Proxy Manager | Mac mini |
 | 首页与监控 | Glance、Glances、Uptime Kuma | NAS |
 | 更新与通知 | Watchtower、Apprise、手机通知路由 | NAS |
@@ -101,7 +101,7 @@ Nginx Proxy Manager，简称 NPM，运行在 Mac mini。当前部署记录中的
 
 NPM 的数据目录和证书目录分别持久化到 `/data` 和 `/etc/letsencrypt`。恢复时两份都要考虑：导出的转发表只能帮助重建规则，不能恢复账号、证书和私钥。
 
-还有一个现有遗留项：NPM 容器 DNS 仍设置为 `192.168.5.1`。这是实际配置中保留的值，不是当前主网地址，也不应作为新部署推荐值；迁移时需要核对其可达性并选用正确 DNS。
+11 月 6 日核对时，NPM 容器已没有显式 DNS 覆盖，旧快照中的 `192.168.5.1` 不再是当前设置。
 
 ### 为什么集中反代
 
@@ -231,69 +231,23 @@ NAS 相册服务端内存上限为 10240 MiB，Node 堆设置为 4096 MiB；数�
 
 因此完整恢复需要同时考虑文件和数据库，并核对备份时间的一致性。本文没有确认现有备份周期、保留策略和恢复演练结果，这部分仍是需要补齐的运行记录。
 
-## 五、DNS 与网关：分开职责，也承担更多依赖
+## 五、DNS 与网关：迁到 Mac mini，减少对 NAS 的依赖
 
-### DNS：AdGuard 接客户端，SmartDNS 负责上游与缓存
+11 月 6 日实机只读核对时，NAS 已没有 AdGuard Home、SmartDNS 和 network-gateway 容器。DNS 两个组件在 Mac mini 的 Docker host 网络运行，sing-box 是 Mac 原生进程，Surge 提供 SOCKS5 出口。旧 NAS 网络编排已不能代表当前部署。
 
-当前 NAS 三个网络容器均使用 host 网络。AdGuard 在 `0.0.0.0:53` 提供 DNS，管理界面为 `6200`；上游只有 `127.0.0.1:6053`，没有设置 fallback DNS。SmartDNS 仅监听回环的 UDP/TCP `6053`。
+客户端 DNS → Mac mini AdGuard :53 → SmartDNS 127.0.0.1:6053。国内域名走国内 DoH，默认组经 Surge :6153 查询境外 DoH。
 
-```text
-客户端 DNS 请求 → NAS AdGuard :53（过滤、查询观察）
-                   → SmartDNS 127.0.0.1:6053（缓存、域名分组）
-                      ├─ 国内域名表 → 阿里 / 腾讯 DoH，直连
-                      └─ 其他域名 → Surge SOCKS .4:6153 → Cloudflare / Google DoH
-```
+AdGuard 当前开启 4 MiB 缓存，并配置腾讯与 Cloudflare DoH 备用上游；SmartDNS 保留 16384 条缓存、持久化、预取和过期服务。旧快照中“AdGuard 缓存关闭、没有 fallback”的描述已不适用。备用上游不沿用同一套 SmartDNS 分组。
 
-AdGuard 的缓存关闭，缓存集中在 SmartDNS，避免两层缓存各自影响排查。SmartDNS 缓存大小为 16384，写入持久文件并启用预取；过期缓存窗口配置为 300 秒，返回过期记录的 TTL 为 3 秒。缓存有助于减少重复查询，上游短暂异常时也可能继续提供答案；代价是结果可能暂时过时，不能以缓存命中代替上游健康检查。
+本轮客户端默认网关为 .1，DNS 为 192.168.10.4 与 223.5.5.5。公共备用 DNS 不提供家中同样的过滤与本地域名规则，不能当作功能完全一致的冗余。
 
-境外 DoH 使用域名 URL 保留 TLS 的 SNI / HTTP Host，同时固定连接 IP，例如：
+sing-box 内置 WireGuard endpoint 使用 system: false，监听 UDP 51820，地址为 10.69.69.1/30，MTU 为 1408。旧 NAS 模板中的 10.66.66.1/24 和 MTU 1420 已不适用。
 
-```text
-proxy-server socks5://192.168.10.4:6153 -name surge
-server-https https://cloudflare-dns.com/dns-query -host-ip 1.1.1.1 -proxy surge
-server-https https://dns.google/dns-query -host-ip 8.8.8.8 -proxy surge
-server-https https://dns.alidns.com/dns-query -host-ip 223.5.5.5 -group domestic -exclude-default-group
-nameserver /domain-set:china/domestic
-```
+进入 sing-box 的流量依次经过下载器来源直连、私网直连、协议嗅探、Tracker 与种子源直连、BitTorrent 直连、国内规则直连，再拒绝剩余 UDP 443。其余 UDP 交给类型为 direct 的 nintendo-udp 出口，剩余流量经 Surge。国内规则集使用本地文件，不能再按旧模板宣称运行配置每日远程更新。
 
-固定 IP 减少解析上游域名时的循环依赖，域名 URL 和挂载的 CA 证书用于校验身份；代价是固定 IP 失效时需要更新。国内组排除在默认组之外，只由国内域名表选中。默认不测速，国内域名另外配置 `tcp:443` 测速和 `first-ping` 响应策略。
+本轮向 Mac mini 查询本地域名、百度和 Google 均收到 A 记录，客户端绕过应用代理访问百度与 Google 返回 HTTP 200，sing-box 配置检查通过。UDM 策略、整机重启、NAS 与 Mac mini 离线行为、IPv6 和隧道断线回退尚未重新演练。
 
-当前 AdGuard 没有全局禁用 AAAA，SmartDNS 也没有沿用旧文件中全面抑制 AAAA 和 TYPE65 的设置；部分本地域名单独禁止 AAAA。不能继续把旧文件里的 IPv6 限制写成当前策略。
-
-Compose 让 AdGuard 等待 SmartDNS 健康后启动，但健康检查查询的是本地 `home` 域名。这能检查本地解析接口，不足以证明境外 DoH、Surge 或所有上游正常。没有 fallback 有利于保持统一过滤与分流语义，代价是上游链路失败时不会自动改走另一套公共 DNS。
-
-### 网关：WireGuard 仍在，由 Sing-box 内置端点接收
-
-旧的 `wg-home`、dnsq、tproxy 独立容器已经停用，但 WireGuard 协议仍在使用。现在由 Sing-box 的内置 WireGuard endpoint 接收，`system: false`，监听 UDP `51820`，隧道地址 `10.66.66.1/24`，MTU 为 1420。对端允许地址包含 `10.66.66.2/32` 与家庭主网。
-
-因此准确的变化是：从多个旧容器组合收敛到 Sing-box 内置隧道与路由，不是“已经不用 WireGuard”。UDM 对端及其完整策略仍属于外部配置，本文只说明 NAS 侧已导出的规则。
-
-对于进入 Sing-box 的流量，处理顺序为：
-
-1. 下载器来源地址、Tracker 与种子源规则优先直连。
-2. 私网地址直连。
-3. 尝试协议嗅探，识别为 BitTorrent 的连接直连。
-4. 命中国内 IP 或域名规则集时直连。
-5. 尚未匹配的 UDP 443 拒绝，其余 UDP 直连。
-6. 剩余流量默认通过 SOCKS5 到 Mac mini Surge 的 `6153`。
-
-顺序会影响结果：国内规则在 UDP 443 拒绝前，所以不能说所有 QUIC 都被阻断；下载器来源也在最前面，不受后面的通用代理选择影响。拒绝剩余 UDP 443 意在促使支持回退的客户端使用 TCP，但不保证每个应用都会回退。
-
-其余 UDP 是直连，不是通用 UDP 代理。如果某个应用要求境外 UDP 也经过代理，当前规则不满足这个要求。域名嗅探也有识别边界，不能据此宣称所有加密流量都能按真实域名分流。
-
-国内规则集每一天更新一次，更新请求经 Surge；同时保留本地规则文件与缓存，减少启动时完全依赖远端下载的需要。这也意味着首次恢复时要准备规则快照，后续更新仍依赖 Mac mini 的代理出口。
-
-### 公网隧道是另一条链路
-
-AutoSSH 从 NAS 主动连接云端，当前反向转发之一为云端 `127.0.0.1:16001` 到 NAS `6001`，对应 Glance。云端仅回环监听，外部入口还需要云端反代等配置，不能把它理解成直接向公网开放 16001。
-
-SSH 设置了严格主机密钥校验、转发失败退出和保活检测，密钥及 `known_hosts` 以只读目录挂载。这样能降低连错服务器及连接失效后长期不重连的风险，代价是云端更换主机密钥时要人工核实更新。另一个 `16106 → NAS:6106` 转发仍指向停用后端，是已记录但尚未清理的遗留项。
-
-### 集中网络服务的收益与成本
-
-集中管理过滤、解析和分流，方便统一修改规则，也方便观察问题。但应用之间的依赖会更长：DNS 故障可能表现为网站打不开，网关故障可能表现为某一类目的地址超时，Surge 故障又可能只影响需要代理的部分请求。
-
-NAS 同时承载 DNS 和多种应用，维护 NAS 时影响可能超出媒体和相册。备用 DNS 是否真正独立、客户端是否及时切换、NAS 离线时哪些连接仍可用，都需要对当前方案重新测试。旧网络方案曾做过故障测试，不能直接当作新方案已经通过的证据。
+迁移减少了网络对 NAS 的依赖，同时增加了 Mac mini 停机时的影响范围。详细配置见 [《家庭网络改造实录》](/2026/10/18/network-rebuild/)。
 
 ## 六、Glance：首页既要好用，也要说明检查范围
 
@@ -358,13 +312,15 @@ Watchtower 当前每天北京时间 04:00 扫描，开启清理、包含重启�
 
 ## 八、配置仓库如何维护，为什么不能直接整组重建
 
-`homelab-docker` 现在已经按实机核对结果整理当前部署：`deploy/nas/` 对应 NAS 的 17 个容器与 8 个部署单元，`deploy/macmini/` 对应 NPM 和机器学习；`deploy/inventory.json` 记录原 Compose 路径、端口与网络。旧的大编排已移出当前目录，需要时查 Git 历史。
+`homelab-docker` 的 11 月 3 日快照按当时实机核对结果整理部署：`deploy/nas/` 对应 NAS 的 17 个容器与 8 个部署单元，`deploy/macmini/` 对应 NPM 和机器学习；`deploy/inventory.json` 记录原 Compose 路径、端口与网络。旧的大编排已移出当前目录，需要时查 Git 历史。
 
 公开模板使用 `HOMELAB_ROOT`、`MEDIA_ROOT`、`NPM_ROOT`、`ML_ROOT` 区分编排位置和数据位置。挂载配置普遍使用 `create_host_path: false`，路径不存在时停止，避免路径拼错后自动创建空目录，让应用看起来像第一次安装。
 
 这提高了恢复的可检查性，代价是首次部署需要先准备真实目录、权限、配置和私有参数。模板中的密码、WireGuard 私钥、SSH 私钥和通知收件地址都是占位或外部文件，不能仅凭公开仓库恢复完整环境。
 
 ### 恢复顺序与边界
+
+以下入口属于 11 月 3 日快照。网络迁移后，应先更新主机归属、挂载与私有参数，不要在 NAS 上直接应用旧网络编排。
 
 恢复时先准备文件与一致性的数据库备份、私有参数、外部 Docker 网络和 Surge / UDM / 云端依赖，再在对应主机运行：
 
@@ -410,4 +366,4 @@ docker exec glance /app/glance -config /app/config/glance.yml config:validate
 
 这套方案的特点是把日常服务集中起来，同时利用两台常开主机分担工作。它也把维护责任留给了自己：设备依赖、路由规则、应用版本和数据备份都要有人照看。
 
-当前已经补齐实际 Compose、挂载和主要网络规则。接下来需要验证的是完整恢复过程与故障降级，并处理 NPM 的旧 DNS、停用后端转发和残留域名等遗留项。配置清单能说明系统如何组成，重启、故障与恢复演练才能说明它在异常时是否仍按预期工作。
+11 月 3 日已整理当时的 Compose 与挂载；网络迁移后，这份快照需要重新核对才能用于恢复。接下来需要验证的是完整恢复过程与故障降级，并核对停用后端转发和残留域名等遗留项。配置清单能说明系统如何组成，重启、故障与恢复演练才能说明它在异常时是否仍按预期工作。

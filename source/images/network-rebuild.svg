@@ -16,8 +16,8 @@
     </marker>
   </defs>
   <rect class="bg" width="960" height="540"/>
-  <text class="h" x="40" y="52">家庭网络：IP 级分流架构</text>
-  <text class="s" x="40" y="78">MAIN 192.168.10.0/24 · UBNT 策略路由 · WireGuard · TCP 代理 / 公网 QUIC 回退</text>
+  <text class="h" x="40" y="52">家庭网络：Mac mini 集中网络服务</text>
+  <text class="s" x="40" y="78">MAIN 192.168.10.0/24 · UniFi · Mac 原生 sing-box / Surge · NAS 存储与应用</text>
 
   <rect class="box" x="40" y="120" width="150" height="64"/>
   <text class="t" x="62" y="150">客户端</text>
@@ -25,33 +25,33 @@
 
   <rect class="box" x="250" y="120" width="170" height="64"/>
   <text class="t" x="270" y="150">UDM 策略路由</text>
-  <text class="s" x="270" y="170">按真实目的 IP 分流</text>
+  <text class="s" x="270" y="170">按控制器策略选择路径</text>
 
   <rect class="box3" x="500" y="120" width="180" height="64"/>
-  <text class="t" x="520" y="150">大陆 IP → WAN1</text>
-  <text class="s" x="520" y="170">直出，不经代理</text>
+  <text class="t" x="520" y="150">本地 / 直连路径</text>
+  <text class="s" x="520" y="170">范围以 UDM 配置为准</text>
 
   <rect class="box2" x="500" y="240" width="180" height="64"/>
-  <text class="t" x="520" y="270">其余 → WG 隧道</text>
-  <text class="s" x="520" y="290">10.66.66.0/24</text>
+  <text class="t" x="520" y="270">策略选中 → WG</text>
+  <text class="s" x="520" y="290">10.69.69.1/30 · 1408</text>
 
   <rect class="box" x="740" y="240" width="180" height="64"/>
-  <text class="t" x="760" y="270">NAS 192.168.10.5</text>
-  <text class="s" x="760" y="290">SNI → Surge SOCKS</text>
+  <text class="t" x="760" y="270">Mac mini .4</text>
+  <text class="s" x="760" y="290">sing-box 分流</text>
 
   <rect class="box" x="740" y="360" width="180" height="64"/>
   <text class="t" x="760" y="390">Surge 策略组</text>
-  <text class="s" x="760" y="410">验证实际出口一致</text>
+  <text class="s" x="760" y="410">SOCKS5 :6153</text>
 
   <rect class="box3" x="250" y="360" width="300" height="64"/>
-  <text class="t" x="270" y="390">DNS：AdGuard Home → dnsq</text>
-  <text class="s" x="270" y="410">国内域名表 109,801 条 → 223.5.5.5</text>
+  <text class="t" x="270" y="390">DNS：AdGuard → SmartDNS</text>
+  <text class="s" x="270" y="410">Mac mini :53 → :6053 → 分组 DoH</text>
 
   <path class="l" d="M190,152 H245"/>
   <path class="l" d="M420,140 H495"/>
   <path class="l" d="M420,165 C460,165 460,272 495,272"/>
   <path class="l" d="M680,272 H735"/>
   <path class="l" d="M830,304 V355"/>
-  <path class="l" d="M680,392 H555"/>
-  <path class="l" d="M420,196 C420,300 250,300 250,355"/>
+
+  <path class="l" d="M115,184 V392 H245"/>
 </svg>
