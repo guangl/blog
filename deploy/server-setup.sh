@@ -193,6 +193,35 @@ rm -f /etc/nginx/sites-enabled/default
 # 也就没有「备案后忘了切」这个坑。
 # ---------------------------------------------------------------------------
 
+# 三个提供内容的入口共用缓存规则。Cache-Control 写在 server 级，
+# location 只设置值，避免 add_header 的继承规则使 HTTPS 安全响应头丢失。
+write_content_locations() {
+  cat <<'NGINX'
+    set $blog_cache_control "no-cache";
+    add_header Cache-Control $blog_cache_control;
+
+    location / {
+        try_files $uri $uri/index.html $uri/ =404;
+    }
+
+    # 仅内容指纹文件长期缓存；更新后 URL 会改变。
+    location ~* "^/site-assets/[^/]+\.[a-f0-9]{16}\.(?:css|js|mjs|txt)$" {
+        set $blog_cache_control "public, max-age=31536000, immutable";
+        try_files $uri =404;
+        access_log off;
+    }
+
+    # 原始主题文件、同名图片仍可能更新，保留短缓存。
+    location ~* \.(?:css|js|mjs|woff2?|ttf|eot|svg|png|jpe?g|webp|avif|gif|ico)$ {
+        set $blog_cache_control "public, max-age=86400, stale-while-revalidate=604800";
+        try_files $uri =404;
+        access_log off;
+    }
+
+    error_page 404 /404.html;
+NGINX
+}
+
 # 80 的默认站点：凡是不匹配下面那些域名 server_name 的请求（也就是用 IP 直连）
 # 都落在这里，直接把站点内容给出去。
 write_http_default_block() {
@@ -219,13 +248,9 @@ server {
         default_type "text/plain";
     }
 
-    location / {
-        try_files $uri $uri/index.html $uri/ =404;
-    }
-
-    error_page 404 /404.html;
-}
 NGINX
+  write_content_locations
+  printf '}\n'
 }
 
 # 按域名访问时走的那个 80 站点，两种形态：
@@ -261,13 +286,9 @@ NGINX
     root __SITE_ROOT__;
     index index.html;
 
-    location / {
-        try_files $uri $uri/index.html $uri/ =404;
-    }
-
-    error_page 404 /404.html;
-}
 NGINX
+    write_content_locations
+    printf '}\n'
   fi
 }
 
@@ -310,26 +331,9 @@ server {
     # 由 install_compression_conf 写入）。写在这个 443 块里只覆盖这一台站点，
     # 而 IP 直连走的是 80 的默认站点，那样它会原样发 388KB 的 main.css。
 
-    # Hexo 的目录式链接（/posts/、/2026/09/13/xxx/）落在各自的 index.html 上
-    location / {
-        try_files $uri $uri/index.html $uri/ =404;
-        expires -1;                 # HTML 每次回源校验，避免读者拿到缓存的旧版本
-    }
-
-    # 静态资源带内容指纹，可以长缓存
-    location ~* \.(?:css|js|mjs|woff2?|ttf|eot|svg|png|jpe?g|webp|avif|gif|ico)$ {
-        expires 30d;
-        access_log off;
-    }
-
-    # 站点地图、订阅源、robots 始终回源，方便搜索引擎和阅读器取到最新版本
-    location ~ ^/(?:sitemap\.xml|atom\.xml|robots\.txt|search\.json)$ {
-        expires -1;
-    }
-
-    error_page 404 /404.html;
-}
 NGINX
+  write_content_locations
+  printf '}\n'
 }
 
 # 备用域名统一 301 到主站，避免搜索引擎把同一个站点分别收录。

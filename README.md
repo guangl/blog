@@ -121,9 +121,9 @@ hankou-river-beach:
 - 浏览器支持 AVIF 就用 AVIF，其次 WebP，最后才回退 JPEG；
 - `<source>` 带 `srcset` + `sizes`，手机不会去下 1600px 的图；
 - `img` 上补了 `width` / `height`，避免图片加载完把正文顶下去（CLS）；
-- 图片**一律原生懒加载**（`loading="lazy"` + `decoding="async"`）。2026-10-17 之前 Hero 背景和文章页头图是 `eager` + `fetchpriority="high"`，理由是它们通常是 LCP；现在首页 Hero 整个关掉了，站点上没有值得抢首屏的大图，例外一起删掉。自检会断言每个 `<img>` 都带 `loading="lazy"`（`data:` 占位图除外）。
-- 主题自带的懒加载在这里被接管：`.lazy` 类与 `data-src` 会被去掉，改用原生 `loading="lazy"`。原因是 `<picture>` 的 `<source>` 一旦被浏览器选中，再改 `<img src>` 就没用了，两套机制会打架。主题标了 `no-lazy` 的头像也会补上原生懒加载。
-- 首页 Hero 关闭后，首页只剩 HTML（约 11 KB gzip）+ `main.css`（约 49 KB）+ 几个 JS，不再请求任何照片；那张 1600px 的 Hero 背景（62 KB）是之前最大的单项。
+- 正文与相册图片使用原生懒加载（`loading="lazy"` + `decoding="async"`），首页头像保留 `eager`。所有页面的本地头像均声明实际宽高，减少图片出现时的布局偏移。
+- 主题自带的懒加载在这里被接管：`.lazy` 类与 `data-src` 会被去掉，改用原生 `loading="lazy"`。原因是 `<picture>` 的 `<source>` 一旦被浏览器选中，再改 `<img src>` 就没用了，两套机制会打架。其它页面中主题标了 `no-lazy` 的头像也会补上原生懒加载。
+- 首页 Hero 已关闭，首屏以文字为主。全站关键样式内联，完整样式异步加载，脚本按依赖顺序合并并延后执行。
 
 只处理「页面上真的用 `<img>` 显示出来」的图。正文里 `[![…](preview.jpg)](main.jpg)` 的链接目标（`main.jpg`）不生成变体——为一张 7008px 的原图编码 4K AVIF 是纯浪费。实测效果：正文图在手机上从 137KB 降到 9.4KB，列表页封面从 60KB 降到 4KB。
 
@@ -210,13 +210,15 @@ Cloudflare Pages 的 `_headers` 由 `scripts/cloudflare-headers.js` 在构建期
 
 `style-src` 里的 `gcore.jsdelivr.net` 是 2026-10-17 加相册页时补的：主题的 lightbox 扩展只在页面出现 `[data-fancybox]`（相册、以后的图集）时才挂载，并从那里拉 Fancybox 的 CSS。不放行的话灯箱样式表被拦、点击没有任何反应，而控制台只在打开相册页时才会报——`bun run browser:a11y` 按 `_headers` 起本地服务，正好能提前抓到这种「只有某个页面才踩到」的 CSP 问题。`tools/check-site.mjs` 现在会断言 `style-src` 放行了它。
 
-缓存策略给 CSS / JS / 图片一周的 `stale-while-revalidate`，`sitemap.xml` / `atom.xml` / `search.json` / `robots.txt` 一小时。这里有两条 Cloudflare 的规则在约束写法，别按直觉改：
+全站优化由 `scripts/site-styles.js` 与 `scripts/site-scripts.js` 在构建期执行。关键 CSS 按每页 DOM 提取，保留响应式、深色和交互状态，完整 CSS 异步加载并提供禁用 JavaScript 时的回退。共享脚本和运行时基础模块分别打包，图表、搜索和灯箱仍按主题生命周期加载。滚动渐入与卡片光斑、倾斜效果已关闭。
+
+带内容指纹的 `site-assets/*` 缓存一年并设 `immutable`，原始 CSS / JS / 图片缓存一天，允许一周的 `stale-while-revalidate`。`sitemap.xml` / `atom.xml` / `search.json` / `robots.txt` 缓存一小时。这里有两条 Cloudflare 的规则在约束写法，别按直觉改：
 
 1. **`*` 是贪婪通配，能跨 `/` 匹配**（官方文档：a splat will greedily match all characters），所以 `/*.jpg` 能覆盖到 `2026/09/13/<slug>/cover.jpg` 这种深层路径。
-2. **同一个头命中多条规则时，值会用逗号拼在一起**。所以 `/*` 上**不能**再写 `Cache-Control`，否则会和 `/*.css` 之类的规则拼成 `public, max-age=0, …, public, max-age=86400, …` 这种语义不明的东西；HTML 用 Cloudflare Pages 的默认值（实测 `public, max-age=0, must-revalidate`，正是文档页想要的）。同理，各条缓存规则之间不能有交集，图标 JSON 用 `/js/icons/*`、搜索索引用精确路径，而不是 `/*.json`。
+2. **同一个头命中多条规则时，值会用逗号拼在一起**。所以 `/*` 上**不能**再写 `Cache-Control`，否则会和 `/*.css` 之类的规则拼成 `public, max-age=0, …, public, max-age=86400, …` 这种语义不明的东西；HTML 用 Cloudflare Pages 的默认值（实测 `public, max-age=0, must-revalidate`，正是文档页想要的）。同理，各条缓存规则之间不能有交集，脚本与图标 JSON 共用 `/js/*`，样式用 `/css/*`，指纹资源用 `/site-assets/*`，搜索索引用精确路径。
 3. 一个项目最多 **100 条**规则（现在是 15 条），`tools/check-site.mjs` 会守住这几条约定。
 
-**第二条通道（腾讯云 ECS + Nginx）不认 `_headers` 文件**，安全头是在 `deploy/server-setup.sh` 的 Nginx 模板里另写一遍的（`add_header`）。两处的 CSP 字符串必须逐字符相同，`tools/check-site.mjs` 会直接比对这两份，改一处忘了另一处就会构建失败。Nginx 那边还有两点不同：缓存用 `expires -1` / `expires 30d` 表达同一套意图；HSTS 是**故意没开**的（见脚本里的注释——等 HTTPS 稳定跑一段时间再加），所以大陆通道目前比 Cloudflare 通道少一条 HSTS。
+**第二条通道（腾讯云 ECS + Nginx）不认 `_headers` 文件**，安全头是在 `deploy/server-setup.sh` 的 Nginx 模板里另写一遍的（`add_header`）。两处的 CSP 字符串必须逐字符相同，`tools/check-site.mjs` 会直接比对这两份，改一处忘了另一处就会构建失败。Nginx 那边还有两点不同：HTML、搜索与订阅源设为 `no-cache`，内容指纹资源缓存一年，其余静态文件缓存一天；HSTS 是**故意没开**的（见脚本里的注释——等 HTTPS 稳定跑一段时间再加），所以大陆通道目前比 Cloudflare 通道少一条 HSTS。
 
 压缩是**单独一份 http 级配置**（`/etc/nginx/conf.d/blog-compression.conf`，由脚本的 `install_compression_conf` 写入），不放在 `server` 块里。原因是 nginx 的 `gzip` 只作用于所在的块及其子块，而本站有三个入口——80 的 IP 默认站点、80 的域名站点、443 的主站点；写在 443 上就只有按域名访问才压缩，备案前唯一能用的 IP 入口会把 388 KB 的 `main.css` 原样发出去。Debian 自带的 `nginx.conf` 里已经有一行 http 级 `gzip on;`（但 `gzip_types` 全是注释，默认只压 HTML），所以脚本先检测它、有就只补参数，避免 `duplicate directive "gzip"` 让 `nginx -t` 失败。细节见 [传输压缩（gzip）](docs/mainland-hosting.md#传输压缩gzip)。
 
@@ -416,6 +418,8 @@ bun run seo:ping       # 推送 IndexNow
 | `math-protect.js` / `mermaid-blocks.js` | 公式与图表的构建期处理（见上一节） |
 | `image-pipeline.js` | 生成图片变体、把 `<img>` 改写成 `<picture>`（见 [图片](#图片)） |
 | `a11y.js` | `h1` 归一、列表页补标题、图片补 `alt`、viewport 去缩放锁、补 skip link（见 [无障碍](#无障碍)） |
+| `site-scripts.js` | 全站脚本延后执行、共享运行时打包、本地懒加载依赖 |
+| `site-styles.js` | 关键样式内联、完整样式异步加载、静态图片原生懒加载 |
 | `cloudflare-headers.js` | 生成 `_headers`（见 [响应头与缓存](#响应头与缓存)） |
 | `seo-fixes.js` / `seo-indexing.js` | 修正结构化数据与社交卡片；输出站长平台验证 meta 与 IndexNow 密钥文件 |
 | `beian.js` | 备案号页脚，留空时完全不输出 |

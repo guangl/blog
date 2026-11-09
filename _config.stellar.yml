@@ -171,17 +171,14 @@ footer:
 features:
   color_scheme_switch:
     enabled: true
+  # 阅读内容立即出现，省去滚动时的模糊与逐项淡入。
   reveal:
-    enabled: true
-    duration: 800
-    interval: 200
-    distance: 8
-    blur: 4
+    enabled: false
   link_prefetch:
     enabled: false
   card_hover:
-    spotlight: true
-    tilt: true
+    spotlight: false
+    tilt: false
   # 数学公式：客户端用 MathJax 排版，仅在页面出现公式时加载。
   math:
     provider: null

@@ -15,9 +15,8 @@
  *      （mermaid / marked / vanilla-lazyload 走 jsdelivr，swiper 走 unpkg，
  *      MathJax 走 cdnjs），以及首页仓库卡片拉取 GitHub API 的 connect-src。
  *   2. **缓存策略**：Pages 默认给所有静态资源 `max-age=14400, must-revalidate`。
- *      这里给 CSS / JS / 图片一周的 stale-while-revalidate，HTML 保持不缓存。
- *      注意 `_headers` 只能按路径匹配、看不到查询串，而主题的资源指纹放在
- *      `?v=` 里，所以不能声明 immutable：路径没变时换图会有一周的缓存窗口。
+ *      内容指纹资源放在 site-assets/，缓存一年；主题原始资源和图片使用短缓存。
+ *      HTML 沿用 Pages 的每次校验策略，发布后读者可以获取新的资源地址。
  *
  * ⚠️ CSP 里含 `'unsafe-inline'`（主题有内联脚本与内联样式，且是构建期注入的），
  * 它挡不住内联脚本注入，但仍能挡住「本站没有显式放行的外部脚本来源」。
@@ -85,21 +84,17 @@ const SECURITY_HEADERS = {
   "Cross-Origin-Resource-Policy": "same-origin"
 };
 
-// 缓存策略。两条 Cloudflare 的规则决定了这里必须「按扩展名、且互不重叠」地分组：
-//   1. `*` 是贪婪通配，能跨 `/` 匹配（官方文档：a splat will greedily match all characters），
-//      所以 `/*.jpg` 能覆盖到文章资源目录里的深层图片路径；
-//   2. **同一个头命中多条规则时，值会用逗号拼在一起**。`/*` 上再写一条 Cache-Control
-//      就会和下面这些规则拼成 `public, max-age=0, ..., public, max-age=86400, ...`
-//      这种语义不明的东西。所以 `/*` 那条只放安全头，不放 Cache-Control——
-//      HTML 继续用 Cloudflare Pages 的默认值（实测是 `public, max-age=0, must-revalidate`，
-//      正是文档页想要的「每次都回源校验」）。
-// 各条之间不能有交集，所以图标 JSON 用目录规则、搜索索引用精确路径，不写 `/*.json`。
+// Cloudflare 会将重叠规则的同名头用逗号拼接，因此按互斥目录和扩展名分组。
+// site-assets/ 中的文件名必须含内容指纹。原始主题文件只有查询串版本号，
+// 保持短缓存，不能获得 immutable。HTML 继续使用 Pages 默认的回源校验。
 const ASSET_CACHE = "public, max-age=86400, stale-while-revalidate=604800";
+const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
 const FEED_CACHE = "public, max-age=3600, stale-while-revalidate=86400";
 
 const CACHE_RULES = [
-  ["/*.css", ASSET_CACHE],
-  ["/*.js", ASSET_CACHE],
+  ["/site-assets/*", IMMUTABLE_CACHE],
+  ["/css/*", ASSET_CACHE],
+  ["/js/*", ASSET_CACHE],
   ["/*.jpg", ASSET_CACHE],
   ["/*.jpeg", ASSET_CACHE],
   ["/*.png", ASSET_CACHE],
@@ -108,7 +103,6 @@ const CACHE_RULES = [
   ["/*.svg", ASSET_CACHE],
   ["/*.ico", ASSET_CACHE],
   ["/*.gif", ASSET_CACHE],
-  ["/js/icons/*", ASSET_CACHE],
   ["/search.json", FEED_CACHE],
   ["/*.xml", FEED_CACHE],
   ["/robots.txt", FEED_CACHE]

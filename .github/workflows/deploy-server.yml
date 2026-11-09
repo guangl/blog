@@ -87,6 +87,9 @@ jobs:
 
       - name: Sync public-domain/ to the server
         run: |
-          rsync --archive --compress --delete --human-readable --stats \
+          # 已打开的旧页面仍可能延后请求旧版资源，保留内容指纹目录。
+          # 延后替换完整文件，避免传输过程中读到半个文件。
+          rsync --archive --compress --delete-delay --delay-updates --human-readable --stats \
+            --filter='P site-assets/***' \
             -e "ssh -p $SERVER_PORT -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes" \
             public-domain/ "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/"

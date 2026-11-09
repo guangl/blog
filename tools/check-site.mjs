@@ -91,7 +91,7 @@ for (const file of pages) {
   report(Boolean($('title').text().trim()), `${path}: missing title`);
   report(Boolean($('meta[name="description"]').attr('content')), `${path}: missing description`);
   // scripts/canonical-notice.js 关掉了主题的「非法克隆站 / 官方备用站」浮层，
-  // 每个页面都必须带上那段内联脚本，否则备用入口上又会弹出提示并插 noindex。
+  // 每个页面都必须保留 opt-out 标记，逻辑可在共享延后执行的脚本里。
   report(raw.includes('data-stellar-no-canonical-tip'), `${path}: missing the canonical-notice opt-out script`);
   if (path === 'index.html') {
     if (homeHeroEnabled) {
@@ -167,14 +167,35 @@ for (const file of pages) {
     report($image.attr('loading') === (firstScreenAvatar ? 'eager' : 'lazy'),
       `${path}: incorrect image loading priority: ${$image.attr('src')}`);
   });
+  report($('style[data-stellar-critical]').text().length > 0,
+    `${path}: critical styles missing`);
+  report($('link[rel="stylesheet"]').length === 0,
+    `${path}: render-blocking stylesheet remains`);
+  const fullStyles = $('link[rel="preload"][as="style"][href^="/site-assets/main."]');
+  report(fullStyles.length === 1 && fullStyles.attr('onload')?.includes("this.rel='stylesheet'"),
+    `${path}: asynchronous full stylesheet missing`);
+  const fallbackStyles = load($('noscript').html() || '')('link[rel="stylesheet"]');
+  report(fallbackStyles.attr('href') === fullStyles.attr('href'),
+    `${path}: stylesheet fallback for disabled JavaScript missing`);
+  report($('img.lazy[data-src]').length === 0,
+    `${path}: static images still require JavaScript to load`);
+  const core = $('script[src^="/site-assets/core."][defer]');
+  report(core.length === 1, `${path}: shared deferred core bundle missing`);
+  report($('script[src]:not([defer], [async], [type="module"])').length === 0,
+    `${path}: parser-blocking external script remains`);
+  report(core.attr('data-stellar-permalink') === site.host
+    || decodeURIPath(core.attr('data-stellar-permalink')) === decodeURIPath(url.href.replace(/index\.html$/, '')),
+    `${path}: deferred script has an incorrect page permalink`);
+  report($('script[type="module"][src^="/site-assets/runtime."]').length === 1,
+    `${path}: bundled runtime missing`);
+  const runtime = JSON.parse($('#stellar-runtime-config').text());
+  const lazy = runtime.extensions.find(extension => extension.id === 'lazy-loading');
+  report(lazy?.config.asset.startsWith('/site-assets/lazyload.'),
+    `${path}: lazy loader is not local`);
+  report(!runtime.extensions.some(extension => ['reveal', 'card-hover'].includes(extension.id)),
+    `${path}: decorative animations still load`);
   if (path === 'index.html') {
-    report($('script[src^="/home-assets/core."][defer]').length === 1, 'Homepage core bundle missing');
-    report($('link[rel="stylesheet"][href^="/home-assets/main."]').length === 1, 'Homepage minified CSS missing');
     report($('.ds-ghinfo, [data-api*="api.github.com"]').length === 0, 'Homepage still requests GitHub API');
-    const runtime = JSON.parse($('#stellar-runtime-config').text());
-    const lazy = runtime.extensions.find(extension => extension.id === 'lazy-loading');
-    report(lazy?.config.asset.startsWith('/home-assets/lazyload.'), 'Homepage lazy loader is not local');
-    report($('link[rel="modulepreload"]').length === 4, 'Homepage runtime preloads missing');
   }
   // SEO：作者 CDN 的占位图不应出现在页面里（应使用本站 fallbacks.cover / avatar）
   report(!raw.includes('cdn-x/placeholder'), `${path}: references theme author placeholder CDN`);
@@ -371,9 +392,18 @@ if (catchAll) {
   // 相册页的 Fancybox 样式表来自 jsdelivr，style-src 漏了灯箱就是死的（点了没反应）
   report(/style-src[^;]*gcore\.jsdelivr\.net/.test(csp), '_headers: CSP style-src does not allow the lightbox stylesheet');
 }
-for (const pattern of ['/*.css', '/*.js', '/*.jpg', '/*.webp', '/*.avif']) {
+for (const pattern of ['/css/*', '/js/*', '/site-assets/*', '/*.jpg', '/*.webp', '/*.avif']) {
   report(headerBlocks.some(block => block.pattern === pattern && block.headers['cache-control']),
     `_headers: missing Cache-Control for ${pattern}`);
+}
+for (const block of headerBlocks) {
+  const immutable = (block.headers['cache-control'] || '').includes('immutable');
+  report(immutable === (block.pattern === '/site-assets/*'),
+    `_headers: immutable cache must be limited to /site-assets/*: ${block.pattern}`);
+}
+for (const asset of files(resolve(output, 'site-assets'))) {
+  report(/\.[a-f0-9]{16}\.(?:css|js|mjs|txt)$/.test(asset),
+    `Long-cached asset has no content fingerprint: ${asset}`);
 }
 report(headerBlocks.length <= 100, `_headers has ${headerBlocks.length} rules, Cloudflare allows 100`);
 
