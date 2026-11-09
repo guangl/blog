@@ -57,6 +57,9 @@ jobs:
       - name: Build and check custom-domain site
         run: bun run verify:domain
 
+      - name: Precompress static content for Nginx
+        run: node tools/precompress-site.mjs public-domain
+
       - name: Check deploy configuration
         env:
           SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}

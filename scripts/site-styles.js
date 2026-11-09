@@ -9,6 +9,15 @@ const postcss = require('postcss');
 const selectorParser = require('postcss-selector-parser');
 const { transformSync } = require('esbuild');
 
+// These attributes describe authored content and do not change while the
+// page is displayed. Matching them avoids inlining every article/card variant.
+const STATIC_ATTRIBUTES = new Set([
+  'data-article-style', 'data-page-layout', 'data-text-indent', 'data-regions',
+  'data-region', 'data-variant', 'data-layout', 'data-density', 'data-leftbar-rail',
+  'color', 'bg', 'size', 'child', 'symbol', 'align', 'type', 'direction',
+  'indent', 'highlight', 'aspect_ratio'
+]);
+
 // Match the page across hover/focus, pseudo elements, media queries and shell
 // state changes. These relaxed selectors are only used to select rules. The
 // emitted selectors and their enclosing conditions remain exactly as authored.
@@ -20,7 +29,9 @@ function relaxedSelector(selector) {
   ast.walkPseudos(node => {
     if (node.value !== ':root') node.replaceWith(wildcard());
   });
-  ast.walkAttributes(node => node.replaceWith(wildcard()));
+  ast.walkAttributes(node => {
+    if (!STATIC_ATTRIBUTES.has(node.attribute)) node.replaceWith(wildcard());
+  });
   ast.walkClasses(node => {
     if (/^(?:is-|has-)|^(?:active|display|show|hide|hidden|collapse|collapsed|expanded|loaded|loading|noresult)$/.test(node.value)) {
       node.replaceWith(wildcard());
@@ -36,19 +47,45 @@ function criticalStyles(tree, $) {
     // Keyframes, and future nested CSS syntax, are retained conservatively.
     if (rule.parent.type === 'atrule' && /keyframes$/i.test(rule.parent.name)) return;
     if (rule.nodes.some(node => node.type !== 'decl' && node.type !== 'comment')) return;
-    if (!matches.has(rule.selector)) {
-      try {
-        matches.set(rule.selector, $(relaxedSelector(rule.selector)).length > 0);
-      } catch {
-        // Unknown selector syntax must never make visible content unstyled.
-        matches.set(rule.selector, true);
+    const selectors = rule.selectors.filter(selector => {
+      if (!matches.has(selector)) {
+        try {
+          matches.set(selector, $(relaxedSelector(selector)).length > 0);
+        } catch {
+          // Unknown selector syntax must never make visible content unstyled.
+          matches.set(selector, true);
+        }
       }
-    }
-    if (!matches.get(rule.selector)) rule.remove();
+      return matches.get(selector);
+    });
+    if (selectors.length) rule.selectors = selectors;
+    else rule.remove();
   });
   critical.walkAtRules(rule => {
     if (/^(?:media|supports)$/.test(rule.name) && rule.nodes?.length === 0) rule.remove();
   });
+  // Animation declarations may refer to a custom property resolved at runtime.
+  // Keep all keyframes in that case, otherwise retain only referenced names.
+  const animations = [];
+  const collectAnimations = styles => styles.walkDecls(/^(?:-\w+-)?animation(?:-name)?$/,
+    declaration => animations.push(declaration.value));
+  collectAnimations(critical);
+  try {
+    // Authored inline styles can also reference the theme's keyframes.
+    collectAnimations(postcss.parse($('style').text()));
+    $('[style]').each((_, element) => collectAnimations(postcss.parse($(element).attr('style'))));
+  } catch {
+    return minify(critical.toString());
+  }
+  const animationValues = animations.join(' ');
+  if (!animationValues.includes('var(') && !animationValues.includes('\\')) {
+    critical.walkAtRules(/keyframes$/i, rule => {
+      const name = rule.params.replace(/^['"]|['"]$/g, '');
+      if (name.includes('\\')) return;
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (!new RegExp(`(^|[^\\w-])${escaped}($|[^\\w-])`).test(animationValues)) rule.remove();
+    });
+  }
   return minify(critical.toString());
 }
 
@@ -94,6 +131,13 @@ hexo.extend.filter.register('after_generate', async () => {
 
     $('img[no-lazy]').filter((_, image) => $(image).attr('src') === avatarHref)
       .attr('width', String(avatar.width)).attr('height', String(avatar.height));
+
+    // The first album photo is visible on both mobile and desktop. Let the
+    // preload scanner discover it before layout-dependent lazy loading runs.
+    if (route === 'gallery/index.html') {
+      $('img.gallery-photo[data-fancybox="gallery-site"]').first()
+        .attr('loading', 'eager').attr('fetchpriority', 'high');
+    }
 
     const critical = criticalStyles(tree, $);
     // Place the full stylesheet after the critical subset, in the original main

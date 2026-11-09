@@ -121,7 +121,7 @@ hankou-river-beach:
 - 浏览器支持 AVIF 就用 AVIF，其次 WebP，最后才回退 JPEG；
 - `<source>` 带 `srcset` + `sizes`，手机不会去下 1600px 的图；
 - `img` 上补了 `width` / `height`，避免图片加载完把正文顶下去（CLS）；
-- 正文与相册图片使用原生懒加载（`loading="lazy"` + `decoding="async"`），首页头像保留 `eager`。所有页面的本地头像均声明实际宽高，减少图片出现时的布局偏移。
+- 正文与相册图片使用原生懒加载（`loading="lazy"` + `decoding="async"`），首页头像和相册首张照片使用 `eager`，相册首图另设 `fetchpriority="high"`。所有页面的本地头像均声明实际宽高，减少图片出现时的布局偏移。
 - 主题自带的懒加载在这里被接管：`.lazy` 类与 `data-src` 会被去掉，改用原生 `loading="lazy"`。原因是 `<picture>` 的 `<source>` 一旦被浏览器选中，再改 `<img src>` 就没用了，两套机制会打架。其它页面中主题标了 `no-lazy` 的头像也会补上原生懒加载。
 - 首页 Hero 已关闭，首屏以文字为主。全站关键样式内联，完整样式异步加载，脚本按依赖顺序合并并延后执行。
 
@@ -210,7 +210,7 @@ Cloudflare Pages 的 `_headers` 由 `scripts/cloudflare-headers.js` 在构建期
 
 `style-src` 里的 `gcore.jsdelivr.net` 是 2026-10-17 加相册页时补的：主题的 lightbox 扩展只在页面出现 `[data-fancybox]`（相册、以后的图集）时才挂载，并从那里拉 Fancybox 的 CSS。不放行的话灯箱样式表被拦、点击没有任何反应，而控制台只在打开相册页时才会报——`bun run browser:a11y` 按 `_headers` 起本地服务，正好能提前抓到这种「只有某个页面才踩到」的 CSP 问题。`tools/check-site.mjs` 现在会断言 `style-src` 放行了它。
 
-全站优化由 `scripts/site-styles.js` 与 `scripts/site-scripts.js` 在构建期执行。关键 CSS 按每页 DOM 提取，保留响应式、深色和交互状态，完整 CSS 异步加载并提供禁用 JavaScript 时的回退。共享脚本和运行时基础模块分别打包，图表、搜索和灯箱仍按主题生命周期加载。滚动渐入与卡片光斑、倾斜效果已关闭。
+全站优化由 `scripts/site-styles.js` 与 `scripts/site-scripts.js` 在构建期执行。关键 CSS 按每页 DOM 提取，保留响应式、深色和交互状态，完整 CSS 异步加载并提供禁用 JavaScript 时的回退。共享脚本和运行时基础模块分别打包，小型常用扩展合入运行时。静态图标在构建时填充，搜索提供器在首次点击、聚焦或快捷键打开后加载，图片兼容库在出现动态懒加载图片时加载。图表与灯箱仍按页面需要加载。滚动渐入与卡片光斑、倾斜效果已关闭。
 
 带内容指纹的 `site-assets/*` 缓存一年并设 `immutable`，原始 CSS / JS / 图片缓存一天，允许一周的 `stale-while-revalidate`。`sitemap.xml` / `atom.xml` / `search.json` / `robots.txt` 缓存一小时。这里有两条 Cloudflare 的规则在约束写法，别按直觉改：
 
@@ -219,6 +219,8 @@ Cloudflare Pages 的 `_headers` 由 `scripts/cloudflare-headers.js` 在构建期
 3. 一个项目最多 **100 条**规则（现在是 15 条），`tools/check-site.mjs` 会守住这几条约定。
 
 **第二条通道（腾讯云 ECS + Nginx）不认 `_headers` 文件**，安全头是在 `deploy/server-setup.sh` 的 Nginx 模板里另写一遍的（`add_header`）。两处的 CSP 字符串必须逐字符相同，`tools/check-site.mjs` 会直接比对这两份，改一处忘了另一处就会构建失败。Nginx 那边还有两点不同：HTML、搜索与订阅源设为 `no-cache`，内容指纹资源缓存一年，其余静态文件缓存一天；HSTS 是**故意没开**的（见脚本里的注释——等 HTTPS 稳定跑一段时间再加），所以大陆通道目前比 Cloudflare 通道少一条 HSTS。
+
+源站工作流在验证后运行 `tools/precompress-site.mjs`，提前生成 gzip9 文件，Nginx 通过 `gzip_static` 直接发送。缺少预压缩文件时使用动态 gzip。Cloudflare 使用平台自身的压缩。
 
 压缩是**单独一份 http 级配置**（`/etc/nginx/conf.d/blog-compression.conf`，由脚本的 `install_compression_conf` 写入），不放在 `server` 块里。原因是 nginx 的 `gzip` 只作用于所在的块及其子块，而本站有三个入口——80 的 IP 默认站点、80 的域名站点、443 的主站点；写在 443 上就只有按域名访问才压缩，备案前唯一能用的 IP 入口会把 388 KB 的 `main.css` 原样发出去。Debian 自带的 `nginx.conf` 里已经有一行 http 级 `gzip on;`（但 `gzip_types` 全是注释，默认只压 HTML），所以脚本先检测它、有就只补参数，避免 `duplicate directive "gzip"` 让 `nginx -t` 失败。细节见 [传输压缩（gzip）](docs/mainland-hosting.md#传输压缩gzip)。
 

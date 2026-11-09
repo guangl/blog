@@ -145,26 +145,30 @@ for (const file of pages) {
   const imagesWithoutAlt = $('img').filter((_, image) => $(image).attr('alt') === undefined);
   report(imagesWithoutAlt.length === 0,
     `${path}: ${imagesWithoutAlt.length} image(s) without an alt attribute`);
+  const galleryFirstPhoto = path === 'gallery/index.html'
+    ? $('img.gallery-photo[data-fancybox="gallery-site"]').first()[0] : null;
+  if (galleryFirstPhoto) {
+    report($(galleryFirstPhoto).attr('fetchpriority') === 'high',
+      'Gallery first visible photo must have high fetch priority');
+  }
   // 图片优化管线：改写过的图必须是 <picture> + srcset，且带尺寸（避免 CLS）
   $('picture > img').each((_, image) => {
     const $image = $(image);
     report(Boolean($image.attr('srcset')), `${path}: <picture> img without srcset: ${$image.attr('src')}`);
     report(Boolean($image.attr('width')) && Boolean($image.attr('height')),
       `${path}: <picture> img without width/height: ${$image.attr('src')}`);
-    report($(image).attr('loading') === 'lazy',
-      `${path}: <picture> img is not lazy-loaded: ${$image.attr('src')}`);
+    report($(image).attr('loading') === (image === galleryFirstPhoto ? 'eager' : 'lazy'),
+      `${path}: <picture> img has incorrect loading priority: ${$image.attr('src')}`);
     report(!$image.attr('data-src'), `${path}: <picture> img still carries the theme's data-src`);
   });
-  // 「图片全部懒加载」（2026-10-17）：首页 Hero 的大图去掉之后，站点上没有任何
-  // 需要抢首屏的图，所有 <img> 都必须原生懒加载，包括主题标了 no-lazy 的头像。
-  // data: 占位图除外——那是主题 JS 懒加载的钩子（真地址在 data-src），加原生 lazy
-  // 反而会在 JS 没跑时留下永久占位图。
+  // 首屏相册照片与首页头像立即加载，其余静态图片使用原生懒加载。
+  // data: 占位图保留给主题动态图片的兼容适配器。
   $('img').each((_, image) => {
     const $image = $(image);
     if (/^data:/i.test($image.attr('src') || '')) return;
     const firstScreenAvatar = path === 'index.html' && $image.is('[no-lazy]')
       && $image.attr('src') === '/images/avatar.png';
-    report($image.attr('loading') === (firstScreenAvatar ? 'eager' : 'lazy'),
+    report($image.attr('loading') === (firstScreenAvatar || image === galleryFirstPhoto ? 'eager' : 'lazy'),
       `${path}: incorrect image loading priority: ${$image.attr('src')}`);
   });
   report($('style[data-stellar-critical]').text().length > 0,

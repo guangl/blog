@@ -416,6 +416,11 @@ NGINX
   else
     printf '%s\n' '# nginx.conf 里没有 http 级的 gzip on，这里自己打开。' 'gzip on;'
   fi
+  # 部署工作流预先生成 .gz，省去每个请求现场压缩的 CPU 与等待。
+  # 没有此模块的安装仍使用下面的动态 gzip。
+  if nginx -V 2>&1 | grep -q -- '--with-http_gzip_static_module'; then
+    printf '%s\n' 'gzip_static on;'
+  fi
   cat <<'NGINX'
 gzip_vary on;
 gzip_comp_level 5;

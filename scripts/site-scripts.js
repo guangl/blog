@@ -35,10 +35,11 @@ hexo.extend.filter.register('after_generate', async () => {
     return pathname.slice((hexo.config.root || '/').length);
   };
 
-  // The runtime's four mandatory dependencies form one download. Extensions
-  // retain their own selector-based imports and lifecycle management.
+  // Bundle the mandatory dependencies and small document-level extensions.
+  // Heavy and page-specific extensions retain selector-based imports.
   const runtimeRoute = 'js/runtime/index.js';
   let runtime = await readRoute(runtimeRoute);
+  const commonExtensions = ['color-scheme-switch', 'page-controls', 'search', 'lazy-loading'];
   const dependencies = ['asset-loader', 'extension-registry', 'legacy-request-adapter', 'request-cache'];
   const imports = dependencies.map((name, index) => {
     const expression = 'import(`./' + name + '.js${RUNTIME_QUERY}`)';
@@ -46,6 +47,19 @@ hexo.extend.filter.register('after_generate', async () => {
     runtime = runtime.replace(expression, `runtimeDependency${index}`);
     return `import * as runtimeDependency${index} from './${name}.js';`;
   });
+  commonExtensions.forEach((name, index) => {
+    imports.push(`import * as commonExtension${index} from './extensions/${name}.js';`);
+  });
+  const registryCall = 'registryModule.createExtensionRegistry({ onError(detail) {';
+  if (!runtime.includes(registryCall)) throw new Error('Runtime extension registry changed');
+  runtime = runtime.replace(registryCall, `registryModule.createExtensionRegistry({
+    importer(specifier) {
+      const url = new URL(specifier, document.baseURI);
+      const bundled = new Map([${commonExtensions.map((name, index) =>
+    `[assets.resolve('/js/runtime/extensions/${name}.js'), commonExtension${index}]`).join(',')}]);
+      return url.origin === location.origin && bundled.has(url.pathname) ? bundled.get(url.pathname) : import(specifier);
+    },
+    onError(detail) {`);
   const result = await build({
     stdin: { contents: imports.join('\n') + '\n' + runtime, sourcefile: runtimeRoute },
     bundle: true, write: false, format: 'esm', platform: 'browser',
@@ -53,12 +67,18 @@ hexo.extend.filter.register('after_generate', async () => {
     plugins: [{
       name: 'generated-runtime',
       setup(builder) {
-        builder.onResolve({ filter: /^\.\// }, args => ({
-          path: path.posix.join('js/runtime', args.path), namespace: 'generated-runtime'
+        builder.onResolve({ filter: /^\.{1,2}\// }, args => ({
+          path: path.posix.join(path.posix.dirname(args.importer || runtimeRoute), args.path), namespace: 'generated-runtime'
         }));
-        builder.onLoad({ filter: /.*/, namespace: 'generated-runtime' }, async args => ({
-          contents: await readRoute(args.path), loader: 'js'
-        }));
+        builder.onLoad({ filter: /.*/, namespace: 'generated-runtime' }, async args => {
+          const override = /^js\/runtime\/extensions\/(search|lazy-loading)\.js$/.exec(args.path);
+          return {
+            contents: override
+              ? fs.readFileSync(path.join(hexo.base_dir, `tools/runtime/${override[1]}.mjs`), 'utf8')
+              : await readRoute(args.path),
+            loader: 'js'
+          };
+        });
       }
     }]
   });
@@ -67,6 +87,7 @@ hexo.extend.filter.register('after_generate', async () => {
   const lazyHref = emit('lazyload', minify(fs.readFileSync(path.join(lazyDirectory, 'dist/lazyload.min.js'), 'utf8')));
   emit('lazyload-LICENSE', fs.readFileSync(path.join(lazyDirectory, 'LICENSE'), 'utf8'), 'txt');
   const bundles = new Map();
+  const icons = new Map();
 
   for (const route of hexo.route.list().filter(name => name.endsWith('.html'))) {
     const $ = load(await readRoute(route), { decodeEntities: false });
@@ -102,11 +123,25 @@ hexo.extend.filter.register('after_generate', async () => {
     $('link[rel="preload"][as="script"]').filter((_, node) =>
       localRoute($(node).attr('href')) === 'js/stellar-icons.js').remove();
 
+    // The generated icon registry is known at build time. Dynamic fragments
+    // still use the theme's deferred icon adapter when they need it.
+    for (const node of $('svg.icon[data-icon]').toArray()) {
+      const key = $(node).attr('data-icon');
+      const namespace = key.split(':')[0];
+      const iconRoute = `js/icons/${namespace}.json`;
+      if (!hexo.route.get(iconRoute)) continue;
+      if (!icons.has(namespace)) icons.set(namespace, JSON.parse(await readRoute(iconRoute))[namespace]);
+      const svg = icons.get(namespace)?.[key];
+      if (svg) $(node).replaceWith(svg);
+    }
+
     const manifest = $('#stellar-runtime-config');
     if (manifest.length) {
       const config = JSON.parse(manifest.text());
       const lazy = config.extensions.find(extension => extension.id === 'lazy-loading');
       if (lazy) lazy.config.asset = '/' + localRoute(lazyHref);
+      const navigation = config.extensions.find(extension => extension.id === 'partial-navigation');
+      if (navigation) navigation.when = { selector: '#stellar-navigation-config' };
       manifest.text(JSON.stringify(config).replace(/</g, '\\u003c'));
     }
     const bootstrap = $('script[type="module"][src]').filter((_, node) => localRoute($(node).attr('src')) === runtimeRoute);
