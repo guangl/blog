@@ -87,6 +87,17 @@ for (const file of pages) {
   const url = new URL(path, site);
   const raw = readFileSync(file, 'utf8');
   const $ = load(raw);
+  if (/^r\/[a-f0-9]{32}\/index\.html$/.test(path)) {
+    report($('meta[name="robots"]').attr('content')?.split(/,\s*/).includes('noindex'), `${path}: missing noindex`);
+    report($('article.md-text #essay-unlock input[type="password"]').length === 1,
+      `${path}: missing protected page form`);
+    report($('#essay-content[hidden]').length === 1 && $('#essay-content').html()?.trim() === '',
+      `${path}: protected article must be empty until unlocked`);
+    for (const index of ['sitemap.xml', 'search.json', 'atom.xml']) {
+      report(!readFileSync(resolve(output, index), 'utf8').includes(path.replace(/index\.html$/, '')),
+        `${path}: listed in ${index}`);
+    }
+  }
   report(!unescapeHTML(raw).includes('https://guangl.github.io/blog'), `${path}: stale GitHub Pages URL`);
   report(Boolean($('title').text().trim()), `${path}: missing title`);
   report(Boolean($('meta[name="description"]').attr('content')), `${path}: missing description`);
