@@ -17,7 +17,7 @@
   </defs>
   <rect class="bg" width="960" height="540"/>
   <text class="h" x="40" y="52">家庭网络：Mac mini 集中网络服务</text>
-  <text class="s" x="40" y="78">MAIN 192.168.10.0/24 · UniFi · Mac 原生 sing-box / Surge · NAS 存储与应用</text>
+  <text class="s" x="40" y="78">MAIN 192.168.10.0/24 · UniFi · Mac 原生 sing-box / Surge · NAS 反代、存储与应用</text>
 
   <rect class="box" x="40" y="120" width="150" height="64"/>
   <text class="t" x="62" y="150">客户端</text>
@@ -45,7 +45,7 @@
 
   <rect class="box3" x="250" y="360" width="300" height="64"/>
   <text class="t" x="270" y="390">DNS：AdGuard → SmartDNS</text>
-  <text class="s" x="270" y="410">Mac mini :53 → :6053 → 分组 DoH</text>
+  <text class="s" x="270" y="410">Mac mini :53 → :6053 → 分组 DoH / DoT</text>
 
   <path class="l" d="M190,152 H245"/>
   <path class="l" d="M420,140 H495"/>
@@ -54,4 +54,8 @@
   <path class="l" d="M830,304 V355"/>
 
   <path class="l" d="M115,184 V392 H245"/>
+  <path class="l" d="M115,392 V478 H245"/>
+  <rect class="box3" x="250" y="446" width="300" height="64"/>
+  <text class="t" x="270" y="476">应用入口：群晖 DSM 反代</text>
+  <text class="s" x="270" y="496">NAS .5 :443 → 各应用后端</text>
 </svg>

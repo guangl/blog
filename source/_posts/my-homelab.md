@@ -1,7 +1,7 @@
 ---
 title: 我的 Homelab：NAS、Mac mini 的配置、分工与取舍
 date: 2026-11-03
-updated: 2026-11-06
+updated: 2026-11-08
 categories:
   - Homelab
 tags:
@@ -15,11 +15,11 @@ article:
   ai_label: generated
 ---
 
-家里的 Homelab 主要围绕群晖 NAS、Mac mini 和 UniFi 网络搭建。NAS 保存数据并运行大部分应用，Mac mini 运行 DNS、sing-box、Surge、反向代理和相册的机器学习服务，UniFi 负责家庭网络的网关与路由。
+家里的 Homelab 主要围绕群晖 NAS、Mac mini 和 UniFi 网络搭建。NAS 保存数据、运行大部分应用并提供 DSM 反向代理，Mac mini 运行 DNS、sing-box、Surge、Tailscale 和相册的机器学习服务，UniFi 负责家庭网络的网关与路由。
 
 最初只是想把几个服务跑起来。服务逐渐增加以后，需要考虑的问题也变多了：照片交给谁保存，计算任务放在哪里，域名怎么指向应用，下载是否经过代理，以及一台设备重启时会影响什么。
 
-这篇把这些配置和取舍一起记下来。部署清单依据配置仓库在 **2026 年 11 月 3 日对照 NAS、Mac mini 和反向代理更新的记录**。本文根据这次实机核验后导出的 `deploy/` 和 `templates/runtime/` 配置更新；网络部分已在 11 月 6 日根据两台主机的实机只读核对更新；其余应用与恢复清单保留 11 月 3 日快照口径，不代表本轮重新验收全部应用。
+这篇把这些配置和取舍一起记下来。部署清单依据配置仓库在 **2026 年 11 月 3 日对照 NAS、Mac mini 和反向代理更新的记录**。本文根据这次实机核验后导出的 `deploy/` 和 `templates/runtime/` 配置更新；网络部分已在 11 月 8 日根据两台主机的实机只读核对更新；其余应用与恢复清单保留 11 月 3 日快照口径，不代表本轮重新验收全部应用。
 
 <!-- more -->
 
@@ -32,11 +32,11 @@ article:
 | 设备或服务 | 地址 | 职责 |
 | --- | --- | --- |
 | UniFi / UDM | `192.168.10.1` | 默认网关与家庭网络路由 |
-| Mac mini | `192.168.10.4` | DNS、sing-box、Surge、Nginx Proxy Manager、Immich 机器学习 |
-| 群晖 NAS | `192.168.10.5` | 存储、主要应用、监控与通知 |
+| Mac mini | `192.168.10.4` | DNS、sing-box、Surge、Tailscale、Immich 机器学习 |
+| 群晖 NAS | `192.168.10.5` | DSM 反向代理、存储、主要应用、监控与通知 |
 | qBittorrent | `192.168.10.6:8080` | 使用独立局域网地址的下载服务 |
 
-11 月 3 日快照中 NAS 有 17 个运行容器、Mac mini 有 2 个。11 月 6 日 Mac mini 已有 4 个容器，sing-box 另以原生进程运行；旧数量不再代表当前部署。数据库、缓存、通知等后台组件也计算在内，所以容器数量不等于应用入口数量。
+11 月 3 日快照中 NAS 有 17 个运行容器、Mac mini 有 2 个。11 月 8 日 Mac mini 有三个运行容器，分别是 AdGuard Home、SmartDNS 和 Immich Machine Learning。sing-box 以原生进程运行。数据库、缓存、通知等后台组件也计算在内，所以容器数量不等于应用入口数量。
 
 按功能看，主要分成几组：
 
@@ -46,72 +46,38 @@ article:
 | 相册 | Immich Server、数据库、Redis | NAS |
 | 相册机器学习 | Immich Machine Learning | Mac mini |
 | DNS 与出网处理 | AdGuard Home、SmartDNS、原生 sing-box | Mac mini |
-| 代理与反向代理 | Surge、Nginx Proxy Manager | Mac mini |
+| 出网代理与远程访问 | Surge、Tailscale | Mac mini |
+| 应用反向代理 | DSM 内置反代 | NAS |
 | 首页与监控 | Glance、Glances、Uptime Kuma | NAS |
 | 更新与通知 | Watchtower、Apprise、手机通知路由 | NAS |
 
 ### 为什么分成两台
 
-照片、媒体文件和应用数据集中在 NAS，文件路径和存储管理比较集中；Mac mini 则承担需要原生运行的 Surge，以及独立的机器学习服务。反向代理也放在 Mac mini，统一转发到 NAS 上的应用。
+照片、媒体文件和应用数据集中在 NAS，文件路径和存储管理比较集中；Mac mini 则承担需要原生运行的 Surge，以及独立的机器学习服务。应用域名统一接入 NAS 的 DSM 反向代理。
 
 这样可以让两台常开设备分别承担工作，减少相册机器学习任务与 NAS 其他任务直接争用同一台主机资源的机会。不过这只是资源分配方式，本文没有两种部署方式的同条件性能对比，不据此声称识别速度或整机吞吐提升了多少。
 
 代价是应用依赖跨了主机。NAS 和 Mac mini 任意一台离线，都可能影响某个完整功能；排查时还要检查两台主机之间的连接。两台设备也不等于高可用：目前没有把相册、反向代理或 DNS 做成可自动接管的双机集群。
 
-## 二、应用入口：用域名统一访问，由 Mac mini 转发
+## 二、应用入口：由群晖 DSM 统一反代
 
-### 怎么配置
-
-Nginx Proxy Manager，简称 NPM，运行在 Mac mini。当前部署记录中的监听端口为：
-
-| 端口 | 用途 |
-| --- | --- |
-| `80` / `443` | HTTP / HTTPS 反向代理入口 |
-| `7001` | NPM 管理界面 |
-
-每个应用建立自己的域名转发，后端使用固定的内网地址和端口。当前映射包括：
+主要应用域名经本地 DNS 解析到 NAS `192.168.10.5`，由 DSM 在 HTTPS `443` 接收，再按域名转发。以下是 11 月 8 日从 DSM 的 Nginx 配置核对的应用入口。
 
 | 域名 | 后端 | 后端协议 |
 | --- | --- | --- |
 | `home.guangluo.top` | `192.168.10.5:6001` | HTTP |
 | `movie.guangluo.top` | `192.168.10.5:6100` | HTTP |
 | `anime.guangluo.top` | `192.168.10.5:6101` | HTTP |
-| `download.guangluo.top` | `192.168.10.6:8080` | HTTP |
+| `download.guangluo.top` | `172.30.61.2:8080` | HTTP |
 | `photo.guangluo.top` | `192.168.10.5:6104` | HTTP |
 | `top.guangluo.top` | `192.168.10.5:6002` | HTTP |
 | `monitor.guangluo.top` | `192.168.10.5:6003` | HTTP |
-| `adguard.guangluo.top` | `192.168.10.5:6200` | HTTP |
+| `adguard.guangluo.top` | `192.168.10.4:6200` | HTTP |
 | `nas.guangluo.top` | `192.168.10.5:5001` | HTTPS |
-| `nginx.guangluo.top` | `192.168.10.4:7001` | HTTP |
 
-例如，相册的代理条目可以理解为：
+AdGuard Home 通过 DNS 重写把 `photo` 指到 NAS，其他表内域名由 SmartDNS 提供本地记录。下载入口经 Docker 控制网连接 qBittorrent，AdGuard 管理入口则跨主机转回 Mac mini。`dsm.guangluo.top` 同样解析到 NAS，可直接访问 DSM。
 
-```text
-访问域名：photo.guangluo.top
-代理后端协议：http
-代理后端地址：192.168.10.5
-代理后端端口：6104
-
-浏览器 → HTTPS 域名入口 → Mac mini NPM → NAS Immich
-```
-
-这说明 HTTPS 在入口与后端之间可能分段：浏览器到 NPM 使用 HTTPS，不代表 NPM 到 NAS 的连接也使用 HTTPS。DSM 的后端则明确使用 HTTPS，不能把所有代理条目一律配置为 HTTP。
-
-域名解析和代理配套配置。当前 SmartDNS 把 `home`、`movie`、`anime`、`download`、`monitor`、`top`、`nginx`、`nas`、`adguard` 等域名解析到 Mac mini 的 `192.168.10.4`，并抑制这些域名的 AAAA 回答；`dsm.guangluo.top` 则直接解析到 NAS `.5`。因此 `nas` 是代理入口，`dsm` 是另一个直达 NAS 的名字，两者不能混为一谈。当前这份本地记录没有单独定义 `photo`，不能仅凭相册代理条目存在就认定本地解析也已覆盖。
-
-NPM 的数据目录和证书目录分别持久化到 `/data` 和 `/etc/letsencrypt`。恢复时两份都要考虑：导出的转发表只能帮助重建规则，不能恢复账号、证书和私钥。
-
-11 月 6 日核对时，NPM 容器已没有显式 DNS 覆盖，旧快照中的 `192.168.5.1` 不再是当前设置。
-
-### 为什么集中反代
-
-这样做首先是为了访问方便。相册、下载和影音分别使用一个容易记的域名，后端端口变更时可以只调整代理条目。HTTPS 入口也能集中管理。
-
-代价是 Mac mini 上的 NPM 成了共享依赖。即使 NAS 应用运行正常，NPM 停机也会让这些域名入口不可用。保留内网后端地址用于排查，可以区分应用故障和入口故障。
-
-另一个取舍是信任范围：HTTP 后端依赖局域网环境，入口加密不能覆盖这一段。是否需要进一步加密，要结合内网隔离和应用支持决定。
-
-最后，能建立域名入口不代表应该公开所有后台。当前清单只说明转发关系，不代表所有服务都经过了公网开放、登录保护和权限范围的逐项验收。
+Mac mini 的 Nginx Proxy Manager 容器已停止。`nginx.guangluo.top` 仍指向 Mac mini，但原管理端口 `7001` 和 HTTPS `443` 均未接受连接。恢复当前域名入口时，应保存 DSM 反代规则和相关证书。旧 NPM 的数据和证书目录只用于恢复旧部署。
 
 ## 三、影音和下载：各做一件事，下载明确走直连
 
@@ -156,7 +122,7 @@ Emby 只读媒体目录，能够读取和播放文件，但不能通过这份挂
 }
 ```
 
-这是插入既有 `route.rules` 前部的一条规则，**不是完整 Sing-box 配置**。它还配合 Tracker 主机、种子源域名和关键词直连规则，并保留原有协议识别后的 BitTorrent 直连及 UDP 直连规则。Surge 侧也在通用规则前加入对应的来源地址、进程和域名规则。
+这是插入既有 `route.rules` 前部的一条规则，**不是完整 Sing-box 配置**。它还配合 Tracker 主机、种子源后缀和关键词直连规则。`mikanani.me` 的 TCP 有单独的代理规则，Surge 中也为该域名指定了策略组。网关规则顺序见《家庭网络改造实录》。
 
 这样分几层处理，是因为协议识别无法可靠判断所有加密连接的用途。固定下载客户端的来源地址更明确，域名和进程规则则补充其他入口。两边都设置，是为了让流量经过任一分流环节时仍遵守下载直连的约定。
 
@@ -164,11 +130,11 @@ Emby 只读媒体目录，能够读取和播放文件，但不能通过这份挂
 
 下载直连可以避免 BT 流量占用代理出口，也让下载行为与日常网页代理的规则分开。固定来源地址还方便排查：来自这台下载器的流量应该有明确出口。
 
-代价是这两个来源地址的流量会整体直连，并非只有可识别的 BT 数据。某个 Tracker 或订阅源在直连网络不可达时，也会受影响。目前约定是直连失败就保留失败，不自动回退代理。
+代价是这两个来源地址的流量会整体直连，并非只有可识别的 BT 数据。某个 Tracker 或订阅源在直连网络不可达时，也会受影响。来源直连规则本身没有自动代理回退。
 
-独立地址通过 `qb_direct_lan` macvlan 网络提供：父接口是 NAS 的 `bond0`，网关为 `.1`，qBittorrent 固定为 `.6`，不再用宿主机端口映射发布 Web UI。另一个 `qb_control` 是 `172.30.61.0/24` 的内部 bridge 网络，下载器固定为 `.2`，Ani-RSS 和 Kuma 也接入它，用于控制与检查。下载器 DNS 指向该网络的 `172.30.61.1`，恢复时要确保 NAS 的 AdGuard 在这个接口上可访问。
+独立地址通过 `qb_direct_lan` macvlan 网络提供：父接口是 NAS 的 `bond0`，网关为 `.1`，qBittorrent 固定为 `.6`，不再用宿主机端口映射发布 Web UI。另一个 `qb_control` 是 `172.30.61.0/24` 的内部 bridge 网络，下载器固定为 `.2`，Ani-RSS 和 Kuma 也接入它，用于控制与检查。下载器 DNS 直接指向 Mac mini 上的 AdGuard Home `192.168.10.4`。
 
-这样把局域网下载身份与容器间控制连接分开，但网络依赖也更多。macvlan 存在宿主机默认不能直接访问自身容器的限制，Glance 当前因此通过 Mac mini 反代检查下载服务。换主机时还要替换 `bond0`、检查网段冲突，不能原样照搬。
+这样把局域网下载身份与容器间控制连接分开，但网络依赖也更多。macvlan 存在宿主机默认不能直接访问自身容器的限制，Glance 使用 DSM 反代入口检查下载服务。换主机时还要替换 `bond0`、检查网段冲突，不能原样照搬。
 
 新增下载器或改变地址后，也必须同步更新来源规则。现有规则无法自动识别所有设备上“下载种子”这个用途，不能只加几个关键词就认为覆盖完整。
 
@@ -181,7 +147,7 @@ NAS 运行 `immich-server`、`immich-database` 和 `immich-redis`，Mac mini 运
 ```text
 浏览器 / 手机
     ↓
-NPM → NAS Immich Server → NAS 数据库、Redis、照片存储
+DSM 反代 → NAS Immich Server → NAS 数据库、Redis、照片存储
                 ↓
          Mac mini 机器学习服务 :3003
 ```
@@ -233,27 +199,17 @@ NAS 相册服务端内存上限为 10240 MiB，Node 堆设置为 4096 MiB；数�
 
 ## 五、DNS 与网关：迁到 Mac mini，减少对 NAS 的依赖
 
-11 月 6 日实机只读核对时，NAS 已没有 AdGuard Home、SmartDNS 和 network-gateway 容器。DNS 两个组件在 Mac mini 的 Docker host 网络运行，sing-box 是 Mac 原生进程，Surge 提供 SOCKS5 出口。旧 NAS 网络编排已不能代表当前部署。
+Mac mini 的 AdGuard Home 在 `:53` 接收查询，转交 SmartDNS `127.0.0.1:6053`。国内域名走阿里 DoH 或腾讯 DoT，默认组通过 Surge SOCKS5 `:6153` 访问境外 DoH。AdGuard 启用 4 MiB 缓存、两个备用 DoH 上游和每日转换的 Johnshall 域名过滤列表。SmartDNS 启用 16,384 条缓存、持久化、预取和过期服务。
 
-客户端 DNS → Mac mini AdGuard :53 → SmartDNS 127.0.0.1:6053。国内域名走国内 DoH，默认组经 Surge :6153 查询境外 DoH。
+本轮客户端从 UDM 收到的默认网关为 `192.168.10.1`，DNS 为 `192.168.10.4` 和 `192.168.10.1`。Mac mini 的原生 sing-box 接收 WireGuard，监听 UDP `51820`，隧道地址为 `10.69.69.1/30`，MTU 为 `1408`。Surge 也在局域网提供 HTTP 代理 `:6152`。Tailscale 另行通告家庭主网，用于远程访问。
 
-AdGuard 当前开启 4 MiB 缓存，并配置腾讯与 Cloudflare DoH 备用上游；SmartDNS 保留 16384 条缓存、持久化、预取和过期服务。旧快照中“AdGuard 缓存关闭、没有 fallback”的描述已不适用。备用上游不沿用同一套 SmartDNS 分组。
-
-本轮客户端默认网关为 .1，DNS 为 192.168.10.4 与 223.5.5.5。公共备用 DNS 不提供家中同样的过滤与本地域名规则，不能当作功能完全一致的冗余。
-
-sing-box 内置 WireGuard endpoint 使用 system: false，监听 UDP 51820，地址为 10.69.69.1/30，MTU 为 1408。旧 NAS 模板中的 10.66.66.1/24 和 MTU 1420 已不适用。
-
-进入 sing-box 的流量依次经过下载器来源直连、私网直连、协议嗅探、Tracker 与种子源直连、BitTorrent 直连、国内规则直连，再拒绝剩余 UDP 443。其余 UDP 交给类型为 direct 的 nintendo-udp 出口，剩余流量经 Surge。国内规则集使用本地文件，不能再按旧模板宣称运行配置每日远程更新。
-
-本轮向 Mac mini 查询本地域名、百度和 Google 均收到 A 记录，客户端绕过应用代理访问百度与 Google 返回 HTTP 200，sing-box 配置检查通过。UDM 策略、整机重启、NAS 与 Mac mini 离线行为、IPv6 和隧道断线回退尚未重新演练。
-
-迁移减少了网络对 NAS 的依赖，同时增加了 Mac mini 停机时的影响范围。详细配置见 [《家庭网络改造实录》](/2026/10/18/network-rebuild/)。
+DNS 特例、下载与通用流量规则的先后顺序，以及实测范围见 [《家庭网络改造实录》](/2026/10/18/network-rebuild/)。
 
 ## 六、Glance：首页既要好用，也要说明检查范围
 
 ### 配置如何组织
 
-Glance 的入口是 `maintenance/glance/config/glance.yml`，通过 include 分成首页、家庭服务、开发和摄影页面，具体组件放在 `widget/`。
+Glance 的入口是 `dashboard/glance/config/glance.yml`，通过 include 分成首页、家庭服务、开发和摄影页面，具体组件放在 `widget/`。
 
 现有编排中，Glance 的关键映射是：
 
@@ -284,7 +240,7 @@ volumes:
 
 代价是检查范围有限：Immich 卡片正常，不代表 `photo.guangluo.top` 的完整访问链路正常。要监测用户实际使用的入口，还需要另加域名层面的检查，不能用后端探测替代。
 
-qBittorrent 是一个例外。由于 Glance 容器无法直连其独立网络地址，检查使用 `https://download.guangluo.top`。因此这张卡片失败可能来自下载器，也可能来自 NPM 或 DNS，需要继续拆解。
+qBittorrent 是一个例外。由于 Glance 容器无法直连其独立网络地址，检查使用 `https://download.guangluo.top`。因此这张卡片失败可能来自下载器，也可能来自 DSM 反代或 DNS，需要继续拆解。
 
 ### 权限与统计
 
@@ -338,11 +294,11 @@ bash scripts/current.sh apply macmini
 
 Immich、Ani-RSS 与 qBittorrent 的文件共享 `homelab_application` 项目名，不能随意对其中一个文件使用 `--remove-orphans`，否则可能移除同项目里的其他服务。两台主机上也有同名项目，它们属于不同 Docker 环境，不能把全部文件直接合并到一台主机执行。
 
-公开仓库另有 Linux 核心安装脚本，但那是单机 12 容器的简化方案，不能用来完整恢复当前 19 容器与家庭网络拓扑。
+公开仓库另有 Linux 核心安装脚本，但那是单机 12 容器的简化方案，不能用来完整恢复当前双主机部署与家庭网络拓扑。
 
 ### 配置备份仍不等于数据备份
 
-需要另外保存照片与媒体、Immich 数据库和数据目录、Emby 与下载订阅配置、Kuma 监控数据库、NPM 数据和证书，以及各类密钥。NPM 转发表 JSON 不是可直接导入的数据库备份，只有它时需要重新建立条目和申请证书。
+需要另外保存照片与媒体、Immich 数据库和数据目录、Emby 与下载订阅配置、Kuma 监控数据库、DSM 反代规则和证书，以及各类密钥。旧 NPM 转发表对应迁移前的入口。
 
 这次仓库整理没有替代备份，也没有执行完整恢复演练。现有运行环境并未因导出而重建；若要切换到新的公开编排入口，仍需核对原项目标记、挂载和私有参数。
 
@@ -358,7 +314,7 @@ docker exec glance /app/glance -config /app/config/glance.yml config:validate
 | --- | --- | --- |
 | 主要数据与应用集中 NAS | 存储和应用数据便于集中管理 | NAS 停机同时影响多类服务 |
 | 机器学习放 Mac mini | 计算任务可单独分配和维护 | 跨主机连接与版本兼容需要一起管理 |
-| Mac mini 集中反代 | 统一域名入口，隐藏后端端口变化 | 反代故障影响多个域名入口 |
+| DSM 集中反代 | 统一域名入口，隐藏后端端口变化 | 反代故障影响多个域名入口 |
 | 下载器独立地址并强制直连 | 来源明确，避免占用代理出口 | 网络与路由配置更多，直连失败不回退代理 |
 | 首页优先检查内网后端 | 更容易定位应用本身的问题 | 不能证明用户访问的完整域名链路正常 |
 | 首页读取 Docker socket | 能直接展示 NAS 容器状态 | 增加首页服务的权限与信任范围 |
