@@ -57,7 +57,7 @@
     "postcss-selector-parser": "7.2.0",
     "sharp": "^0.35.5",
     "tencentcloud-sdk-nodejs-dnspod": "4.1.266",
-    "tencentcloud-sdk-nodejs-ssl": "4.1.281",
+    "tencentcloud-sdk-nodejs-ssl": "4.1.339",
     "vanilla-lazyload": "19.1.3"
   }
 }
