@@ -2,7 +2,7 @@
 title: OR 改写为 UNION 时如何保留重复值
 date: 2026-11-17
 tags:
-  - 达梦/SQL 优化
+  - SQL 优化
 ---
 
 一行同时满足两个 `OR` 条件时，原查询只返回这一行。改成 `UNION ALL`，它会返回两次。直接用 `UNION` 合并输出列，又可能把两条输出值相同的源记录合成一条。
@@ -22,6 +22,8 @@ FROM (
 ) u;
 ```
 
-再加一行 `(4, 2, 5)`，它会同时命中两个分支。两种写法都应返回四行，其中 `2` 出现三次。核对结果时要比较每个值出现的次数。若目的是让两个分支分别利用索引，还要对照执行计划检查扫描和去重的代价。
+再加一行 `(4, 2, 5)`，它会同时命中两个分支。两种写法都应返回四行，其中 `2` 出现三次。核对结果时要比较每个值出现的次数。有顺序要求时，把 `ORDER BY` 写在最外层。
 
-[达梦文档 · 多表联合检索](https://eco.dameng.com/document/dm/zh-cn/sql-dev/practice-multi-table.html)
+如果是为了让两个分支分别利用索引，先看原查询在目标数据库里的执行计划。有些优化器已能对 `OR` 的各分支利用不同索引。改写后也要把合并时去重的代价算进去。
+
+[PostgreSQL · UNION](https://www.postgresql.org/docs/current/sql-select.html#SQL-UNION) · [达梦文档 · 多表联合检索](https://eco.dameng.com/document/dm/zh-cn/sql-dev/practice-multi-table.html)
