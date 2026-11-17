@@ -21,7 +21,7 @@ topbar:
     - id: notebooks
       icon: default:notebook
       title: 手记
-      url: /notebooks/dba/
+      url: /notebooks/
     - id: archives
       icon: default:calendar
       title: 归档
