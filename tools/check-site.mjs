@@ -87,6 +87,21 @@ for (const file of pages) {
   const url = new URL(path, site);
   const raw = readFileSync(file, 'utf8');
   const $ = load(raw);
+  // 独立 Archify 查看器和文章一起发布，校验原样复制与源码索引。
+  const diagram = /^\d{4}\/\d{2}\/\d{2}\/([^/]+)\/(archify-[\w-]+\/index\.html)$/.exec(path);
+  if (diagram) {
+    const [, slug, filename] = diagram;
+    const asset = `_posts/${slug}/${filename}`;
+    if (config.skip_render?.includes(asset)) {
+      const source = resolve(config.source_dir, asset);
+      report(existsSync(source) && readFileSync(source, 'utf8') === raw, `${path}: diagram differs from its source asset`);
+      report($('meta[name="generator"]').attr('content')?.startsWith('archify '), `${path}: missing Archify generator`);
+      report($('.diagram-container > svg [data-node-id]').length > 0, `${path}: missing architecture nodes`);
+      const evidence = JSON.parse($('#archify-source-evidence-data').text() || '{}');
+      report(evidence.verified === true && evidence.referenceCount > 0, `${path}: missing verified source references`);
+      continue;
+    }
+  }
   if (/^r\/[a-f0-9]{32}\/index\.html$/.test(path)) {
     report($('meta[name="robots"]').attr('content')?.split(/,\s*/).includes('noindex'), `${path}: missing noindex`);
     report($('article.md-text #essay-unlock input[type="password"]').length === 1,

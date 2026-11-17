@@ -1,7 +1,7 @@
 ---
 title: 排查达梦 SQL 日志：从解析到导出
 date: 2026-11-17 22:24:30
-updated: 2026-11-17 22:24:30
+updated: 2026-11-17 22:40:50
 categories:
   - 数据库
 tags:
@@ -27,6 +27,26 @@ article:
 默认构建的 `sqllog2db` 支持达梦传统 SQL 日志和 JDBC 驱动日志。传统日志由 `dm-database-parser-sqllog` 解析，再由 CLI 内部的[适配器](https://github.com/guangl/dm-database-sqllog2db/blob/324c945f8502c8e7d11a749da3bebf017d5cf7e9/src/infrastructure/input/adapters/sql_log.rs#L8-L35)把 `Sqllog` 转为统一的 `LogRecord`；JDBC 日志走另一套解析器。直接用 CLI 时，只需准备日志文件，不需要单独安装解析库，也不需要连接原数据库。
 
 ![sqllog2db 先识别日志格式，传统日志经 Rust 解析库、JDBC 日志经驱动日志解析器，统一成 LogRecord 后由 run 导出文件或由 stats 汇总 ORA 标签记录。](sqllog-pipeline.svg)
+
+## 两个仓库的架构
+
+两张图都可以打开交互版。点选节点可查看对应提交的源码位置。
+
+### sqllog2db：从输入适配到输出
+
+传统 SQL 日志和驱动日志各自解析，统一成 `LogRecord`。`run` 用这些记录做过滤和导出，`stats` 单独扫描并汇总。
+
+![sqllog2db 架构图。输入适配层向 run 处理管道和 stats 统计提供 LogRecord，分别输出本地文件和终端表格。](archify-sqllog2db.svg)
+
+{% asset_link archify-sqllog2db/index.html 打开 sqllog2db 交互架构图 %}
+
+### parser-sqllog：从日志字节到 Rust 记录
+
+同步迭代器逐行读取，按时间戳识别记录边界，再逐条返回 `Sqllog` 或解析错误。异步接口复用同一迭代器，并收集为一批记录。
+
+![parser-sqllog 架构图。文件迭代器合并多行日志，解码后逐条返回结果，也可以选择组合过滤或异步批量收集。](archify-parser-sqllog.svg)
+
+{% asset_link archify-parser-sqllog/index.html 打开 parser-sqllog 交互架构图 %}
 
 ## 先用 stats 缩小范围
 
