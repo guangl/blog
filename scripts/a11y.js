@@ -13,7 +13,7 @@
  *    降级不会改变外观——主题的标题样式挂在 `.title` 类上（
  *    `.article.banner .content .title { font-size: calc(...) }`），与标签名无关。
  *
- * 2. **列表页补一个 h1**。`/posts/`、`/archives/`、`/categories/*`、`/tags/*`
+ * 2. **列表页补一个 h1**。文章、归档、分类、标签和笔记本列表页
  *    这些列表页一个 h1 都没有（主题直接铺卡片，页面级标题只有 <title>）。
  *    这里按 canonical 路径推一个语义正确的 h1 插到 <main> 开头，并用
  *    clip 技巧做视觉隐藏：屏幕阅读器能按标题跳转，画面不变。
@@ -97,6 +97,10 @@ function listingHeading(path) {
   if (clean === "categories") return "分类";
   if (clean === "tags") return "标签";
   if (clean === "settings") return "设置";
+  if (clean === "notebooks") return "笔记本";
+  if (/^notebooks\/dba(?:\/page\/\d+)?$/.test(clean)) return "DBA 手记";
+  const notebookTag = /^notebooks\/dba\/tags\/(.+?)(?:\/page\/\d+)?$/.exec(clean);
+  if (notebookTag) return `DBA 手记：${notebookTag[1]}`;
   const month = /^archives\/(\d{4})\/(\d{2})$/.exec(clean);
   if (month) return `${month[1]} 年 ${Number(month[2])} 月归档`;
   const year = /^archives\/(\d{4})$/.exec(clean);
