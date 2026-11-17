@@ -1,0 +1,10 @@
+name: DBA 手记
+tagline: 数据库运维与 SQL 排查中用得上的记录
+route:
+  path: /notebooks/dba/
+listing:
+  order: 1
+  per_page: 10
+  sort:
+    field: updated
+    direction: desc
