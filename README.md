@@ -292,6 +292,18 @@ node tools/audit-live.mjs --base http://127.0.0.1:4001/   # 换目标（比如�
 | 证书落地（原子替换 + 回滚） | `deploy/install-cert.sh` |
 | 依赖更新的节奏与生态 | `.github/dependabot.yml` |
 
+### 头像与站点图标
+
+`source/images/avatar.png` 是唯一源图，顶栏、侧栏和头像兜底直接使用它。更换头像后运行：
+
+```bash
+bun run favicon
+```
+
+脚本从同一张 PNG 生成四个文件：`source/images/avatar.svg`、`source/images/favicon.svg`、`source/favicon.ico`（16 / 32 / 48px）和 `source/apple-touch-icon.png`（180px，白底且不透明）。两个 SVG 内嵌完整的原始 PNG 字节，是自包含的位图包装，不是矢量重绘；保留现有路径，也避免 favicon 依赖额外的图片请求。
+
+源图与四个产物一起提交，不要手工修改生成文件。ICO 的各尺寸与 Apple 图标都直接从源图缩放，避免多次缩放损失画质。
+
 ## 关于专栏与笔记本
 
 2026-10-17 起站点只保留摄影内容，`topic`（专栏）与 `notebooks`（笔记本）两套栏目连同 `source/_data/topic*.yml`、`source/_data/notebooks/`、`source/notebooks/` 一起移除，顶栏菜单、页脚入口和自检里的必查页面同步删掉。

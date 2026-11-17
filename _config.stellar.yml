@@ -242,7 +242,8 @@ fallbacks:
 ## 现代浏览器认这条，但 RSS 阅读器、旧浏览器和第三方工具常直接请求根目录的
 ## `/favicon.ico`，所以补一条指向多尺寸 .ico 的链接，并给 iOS 书签一个
 ## apple-touch-icon（180×180，不带透明像素，否则 iOS 会垫成黑底）。
-## 两个文件由 `bun run favicon` 从 source/images/favicon.svg 生成，产物提交进仓库。
+## `bun run favicon` 以 source/images/avatar.png 为唯一源图，生成这里的两个文件，
+## 以及内嵌原始 PNG 的 avatar.svg / favicon.svg。四个产物一起提交，不手工修改。
 ##
 ## Hero 对比度：主题只为视频 / 动效英雄加遮罩，图片英雄只有一层「底部渐隐到页面底色」，
 ## 标题、简介和按钮直接压在照片上。2026-10-17 用无头 Chrome 实测首页（当时有背景图）：
