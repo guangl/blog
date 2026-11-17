@@ -30,7 +30,7 @@ WHERE s.state = 'ACTIVE'
 ORDER BY s.last_recv_time;
 ```
 
-`LEFT JOIN` 保留暂时匹配不到事务信息的活动会话。最近接收请求的时间适合用来排序，单条 SQL 的执行耗时需要另查。如果要查看完整 SQL，把示例 ID 换成上面查到的本实例会话 ID。
+`LEFT JOIN` 保留暂时匹配不到事务信息的活动会话。`INS_CNT`、`DEL_CNT`、`UPD_CNT` 是事务的回滚记录计数。最近接收请求的时间适合用来排序，单条 SQL 的执行耗时需要另查。如果要查看完整 SQL，把示例 ID 换成上面查到的本实例会话 ID。
 
 ```sql
 SELECT SF_GET_SESSION_SQL(123456) AS full_sql;
@@ -52,6 +52,6 @@ WHERE s.state = 'ACTIVE'
 ORDER BY s.last_recv_time;
 ```
 
-找到目标实例后，可以连到该节点用本地查询补看事务计数和完整 SQL。也可以查到会话所在的节点号后，用 `SF_GET_SESSION_SQL(节点号, 会话 ID)` 读取。怀疑存在事务阻塞时，再到对应节点[查等待关系](../dm-blocking-sessions/)。
+找到目标实例后，可以连到该节点用本地查询补看事务计数和完整 SQL。也可以查到会话所在的节点号后，用 `SF_GET_SESSION_SQL(节点号, 会话 ID)` 读取。怀疑存在事务阻塞时，[按 DSC 的活动节点数选择等待视图](../dm-blocking-sessions/)。
 
 [达梦文档 · 动态视图](https://eco.dameng.com/document/dm/zh-cn/pm/dm8-admin-manual-appendix2.html) · [达梦文档 · SF_GET_SESSION_SQL](https://eco.dameng.com/document/dm/zh-cn/pm/sql-appendix.html)

@@ -5,7 +5,7 @@ tags:
   - 达梦/会话与锁
 ---
 
-SQL 长时间等不到结果时，可以先查当前实例的事务等待关系。`V$TRXWAIT.ID` 是等待方事务 ID，`WAIT_FOR_ID` 是它正在等的事务 ID。
+SQL 长时间等不到结果时，可以先查事务等待关系。下面前两条查询适用于单机和只有一个活动节点的 DSC。此时 `V$TRXWAIT.ID` 是等待方事务 ID，`WAIT_FOR_ID` 是它正在等的事务 ID。
 
 ## 先看谁在等谁
 
@@ -38,6 +38,21 @@ AND NOT EXISTS (
 );
 ```
 
-这里保留 `IDLE` 会话，因为连接空闲时仍可能有未提交事务。如果等待关系形成环，查询可能找不到源头，可以回到第一条查询查看各段关系。两条 SQL 都只读取当前实例的视图，排查集群时需要结合相关节点的观测结果。
+这里保留 `IDLE` 会话，因为连接空闲时仍可能有未提交事务。如果等待关系形成环，查询可能找不到源头，可以回到第一条查询查看各段关系。
 
-[达梦文档 · SQL 长时间等待问题](https://eco.dameng.com/document/dm/zh-cn/ops/troubleshooting-sql.html)
+## DSC 有多个活动节点时
+
+从任意节点查 `V$DSC_TRXWAIT`。在这个视图里，等待方的事务号是 `TRX_ID`。
+
+```sql
+SELECT w.ep_seqno AS waiting_node,
+       w.trx_id AS waiting_trx_id,
+       w.wait_for_id AS blocking_trx_id,
+       w.wait_time AS wait_ms
+FROM v$dsc_trxwait w
+ORDER BY w.wait_time DESC;
+```
+
+拿到事务 ID 后，可以在 `V$DSC_TRX` 按 `ID` 查事务所在节点 `EP_SEQNO` 和会话号 `SESS_ID`。结合两边的事务号就能追踪跨节点的等待关系。
+
+[达梦文档 · SQL 长时间等待问题](https://eco.dameng.com/document/dm/zh-cn/ops/troubleshooting-sql.html) · [达梦文档 · 监控 DMDSC](https://eco.dameng.com/document/dm/zh-cn/pm/dsc-monitor.html)
