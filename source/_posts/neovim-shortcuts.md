@@ -1,7 +1,7 @@
 ---
 title: Neovim 常用快捷键
 date: 2026-11-17 19:55:38
-updated: 2026-11-17 19:55:38
+updated: 2026-11-17 20:09:17
 categories:
   - 开发工具
 tags:
@@ -45,7 +45,7 @@ article:
 
 ## 在 Neovim 里用 Codex
 
-Sidekick 把 Codex CLI 打开在右侧，面板占 Neovim 总宽度的 40%。
+Sidekick 把 Codex CLI 打开在右侧，面板占 Neovim 总宽度的 40%。 快捷键和面板宽度的设置见 [dotfiles 中的 Sidekick 配置](https://github.com/guangl/dotfiles/blob/b19a74561b5bfb76524853292f5bedcf6fd769e3/home/dot_config/nvim/lua/plugins/sidekick.lua)。
 
 | 在哪里按 | 快捷键 | 用途 |
 | --- | --- | --- |
