@@ -1,6 +1,7 @@
 ---
 title: 带 MAX 的标量子查询改写为 LEFT JOIN
 date: 2026-11-17
+description: 先按关联键求最大值，再连回明细表。用无匹配、全空值和 COUNT 的例子核对改写前后的结果。
 tags:
   - SQL 优化
 ---
