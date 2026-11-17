@@ -1,6 +1,7 @@
 ---
 title: 标量子查询改写为 LEFT JOIN
 date: 2026-11-17
+description: 用关联键唯一和命中多行的例子判断能否改写，再对比达梦、PostgreSQL 和 SQLite 的行为。
 tags:
   - SQL 优化
 ---
