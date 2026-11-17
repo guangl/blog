@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 424" role="img" aria-labelledby="sqllog-pipeline-title sqllog-pipeline-desc" id="sqllog-pipeline-root">
+        <title id="sqllog-pipeline-title">达梦 SQL 日志的处理路径</title>
+        <desc id="sqllog-pipeline-desc">sqllog2db 识别日志格式，传统日志由 Rust 解析库生成 Sqllog，JDBC 日志由驱动日志适配器读取，两路统一为 LogRecord，run 导出 Parquet 或 CSV，stats 对 ORA 标签输出慢 SQL 和高频 SQL。</desc>
+        <defs>
+      <style>#sqllog-pipeline-root { --paper: hsl(210 20% 98%);
+      --surface: #fff;
+      --ink: #151719;
+      --muted: #4f5861;
+      --line: #6c7782;
+      --accent: hsl(166 66% 32%);
+      --tint: hsl(166 42% 93%);
+      --serif: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", ui-serif, Georgia, "Times New Roman", serif;
+      --sans: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+      --mono: Monaco, Menlo, Consolas, system-ui, "Courier New", monospace, sans-serif; }
+      @media (prefers-color-scheme: dark) {
+#sqllog-pipeline-root { --paper: hsl(210 8% 12%);
+        --surface: hsl(210 10% 24%);
+        --ink: #f4f5f6;
+        --muted: #c4ccd2;
+        --line: #a2adb8;
+        --accent: hsl(166 50% 66%);
+        --tint: hsl(166 26% 19%); }
+}
+      #sqllog-pipeline-root { color: var(--ink); font-family: var(--serif); }
+      #sqllog-pipeline-root .diagram-container { width: 100%; overflow-x: auto; }
+      #sqllog-pipeline-root .paper { fill: var(--paper); }
+      #sqllog-pipeline-root .node { fill: var(--surface); stroke: var(--line); }
+      #sqllog-pipeline-root .focus { fill: var(--tint); stroke: var(--accent); stroke-width: 1.5; }
+      #sqllog-pipeline-root .flow { fill: none; stroke: var(--line); stroke-width: 1.5; }
+      #sqllog-pipeline-root .arrowhead { fill: var(--line); }
+      #sqllog-pipeline-root .name { font: 600 15px var(--sans); fill: var(--ink); }
+      #sqllog-pipeline-root .technical { font: 400 12px var(--mono); fill: var(--muted); }
+      #sqllog-pipeline-root .label { font: 500 12px var(--sans); fill: var(--muted); }
+      @media print {
+#sqllog-pipeline-root .diagram-container { overflow-x: visible; }
+}</style>
+          <marker id="sqllog-pipeline-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <path class="arrowhead" d="M0 0 L8 3 L0 6 Z"/>
+          </marker>
+        </defs>
+
+        <rect class="paper" x="0" y="0" width="440" height="424" rx="8"/>
+        <g class="flow" marker-end="url(#sqllog-pipeline-arrow)">
+          <path d="M220 68 V88"/>
+          <path d="M144 124 H120 Q112 124 112 132 V183"/>
+          <path d="M296 124 H320 Q328 124 328 132 V183"/>
+          <path d="M112 236 V248 Q112 256 120 256 H184 Q192 256 192 264 V275"/>
+          <path d="M328 236 V248 Q328 256 320 256 H256 Q248 256 248 264 V275"/>
+          <path d="M192 324 V332 Q192 340 184 340 H120 Q112 340 112 348 V355"/>
+          <path d="M248 324 V332 Q248 340 256 340 H320 Q328 340 328 348 V355"/>
+        </g>
+        <g text-anchor="middle">
+          <rect class="paper" x="40" y="144" width="64" height="24"/>
+          <text class="label" x="72" y="160">传统日志</text>
+          <rect class="paper" x="336" y="144" width="72" height="24"/>
+          <text class="label" x="372" y="160">JDBC 日志</text>
+
+          <rect class="node" x="144" y="20" width="152" height="48" rx="20"/>
+          <text class="name" x="220" y="49">达梦日志文件</text>
+
+          <polygon class="node" points="220,88 296,124 220,160 144,124"/>
+          <text class="name" x="220" y="129">识别格式</text>
+
+          <rect class="focus" x="20" y="184" width="184" height="52" rx="6"/>
+          <text class="name" x="112" y="207">Rust 解析库</text>
+          <text class="technical" x="112" y="224">Sqllog</text>
+
+          <rect class="node" x="236" y="184" width="184" height="52" rx="6"/>
+          <text class="name" x="328" y="207">驱动日志解析器</text>
+          <text class="technical" x="328" y="224">dm-database-driver-log</text>
+
+          <rect class="node" x="144" y="276" width="152" height="48" rx="6"/>
+          <text class="name" x="220" y="296">统一为 LogRecord</text>
+          <text class="technical" x="220" y="313">sqllog2db</text>
+
+          <rect class="node" x="20" y="356" width="184" height="48" rx="20"/>
+          <text class="name" x="112" y="377">run · 导出文件</text>
+          <text class="technical" x="112" y="392">Parquet / CSV</text>
+
+          <rect class="node" x="236" y="356" width="184" height="48" rx="20"/>
+          <text class="name" x="328" y="377">stats · 终端统计</text>
+          <text class="label" x="328" y="392">仅统计 [ORA]</text>
+        </g>
+      </svg>
