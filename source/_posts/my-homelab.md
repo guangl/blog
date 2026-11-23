@@ -1,7 +1,7 @@
 ---
 title: 我的 Homelab：NAS、Mac mini 的配置、分工与取舍
 date: 2026-11-03
-updated: 2026-11-08
+updated: 2026-11-23
 categories:
   - Homelab
 tags:
@@ -19,7 +19,7 @@ article:
 
 最初只是想把几个服务跑起来。服务逐渐增加以后，需要考虑的问题也变多了：照片交给谁保存，计算任务放在哪里，域名怎么指向应用，下载是否经过代理，以及一台设备重启时会影响什么。
 
-这篇把这些配置和取舍一起记下来。部署清单依据配置仓库在 **2026 年 11 月 3 日对照 NAS、Mac mini 和反向代理更新的记录**。本文根据这次实机核验后导出的 `deploy/` 和 `templates/runtime/` 配置更新；网络部分已在 11 月 8 日根据两台主机的实机只读核对更新；其余应用与恢复清单保留 11 月 3 日快照口径，不代表本轮重新验收全部应用。
+这篇把这些配置和取舍一起记下来。主机的网络分工、DNS 和 HTTPS 入口以 **2026 年 11 月 23 日**的现网核对为准。影音、相册和恢复编排的详细配置沿用 11 月 3 日导出的快照。
 
 <!-- more -->
 
@@ -36,7 +36,7 @@ article:
 | 群晖 NAS | `192.168.10.5` | DSM 反向代理、存储、主要应用、监控与通知 |
 | qBittorrent | `192.168.10.6:8080` | 使用独立局域网地址的下载服务 |
 
-11 月 3 日快照中 NAS 有 17 个运行容器、Mac mini 有 2 个。11 月 8 日 Mac mini 有三个运行容器，分别是 AdGuard Home、SmartDNS 和 Immich Machine Learning。sing-box 以原生进程运行。数据库、缓存、通知等后台组件也计算在内，所以容器数量不等于应用入口数量。
+Mac mini 目前运行 SmartDNS、Immich Machine Learning 和 Collect Metadata 的 PostgreSQL 容器。AdGuard Home 已从 OrbStack 迁到 macOS，由 launchd 启动，sing-box 也以原生进程运行。
 
 按功能看，主要分成几组：
 
@@ -45,9 +45,11 @@ article:
 | 影音与下载 | Emby、Ani-RSS、qBittorrent、Sublarr | NAS |
 | 相册 | Immich Server、数据库、Redis | NAS |
 | 相册机器学习 | Immich Machine Learning | Mac mini |
-| DNS 与出网处理 | AdGuard Home、SmartDNS、原生 sing-box | Mac mini |
+| DNS 与出网处理 | 原生 AdGuard Home、SmartDNS、原生 sing-box | Mac mini |
 | 出网代理与远程访问 | Surge、Tailscale | Mac mini |
 | 应用反向代理 | DSM 内置反代 | NAS |
+| 家庭自动化 | Home Assistant | NAS |
+| 媒体元数据 | Collect Metadata Web、PostgreSQL | NAS、Mac mini |
 | 首页与监控 | Glance、Glances、Uptime Kuma | NAS |
 | 更新与通知 | Watchtower、Apprise、手机通知路由 | NAS |
 
@@ -61,7 +63,7 @@ article:
 
 ## 二、应用入口：由群晖 DSM 统一反代
 
-主要应用域名经本地 DNS 解析到 NAS `192.168.10.5`，由 DSM 在 HTTPS `443` 接收，再按域名转发。以下是 11 月 8 日从 DSM 的 Nginx 配置核对的应用入口。
+主要应用域名经本地 DNS 解析到 NAS `192.168.10.5`，由 DSM 在 HTTPS `443` 接收，再按域名转发。下表是 11 月 23 日从 DSM 的 Nginx 配置核对的 HTTPS 入口。
 
 | 域名 | 后端 | 后端协议 |
 | --- | --- | --- |
@@ -74,8 +76,10 @@ article:
 | `monitor.guangluo.top` | `192.168.10.5:6003` | HTTP |
 | `adguard.guangluo.top` | `192.168.10.4:6200` | HTTP |
 | `nas.guangluo.top` | `192.168.10.5:5001` | HTTPS |
+| `ha.guangluo.top` | `192.168.10.5:8123` | HTTP |
+| `metadata.guangluo.top` | `192.168.10.5:18080` | HTTP |
 
-AdGuard Home 通过 DNS 重写把 `photo` 指到 NAS，其他表内域名由 SmartDNS 提供本地记录。下载入口经 Docker 控制网连接 qBittorrent，AdGuard 管理入口则跨主机转回 Mac mini。`dsm.guangluo.top` 同样解析到 NAS，可直接访问 DSM。
+表中的域名都有指向 NAS 的 AdGuard Home 重写。下载入口经 Docker 控制网连接 qBittorrent，AdGuard 管理入口则跨主机转回 Mac mini。实测表中 11 个 HTTPS 入口均通过证书校验并返回 HTTP 200 或 302。SmartDNS 还保留了 `dsm.guangluo.top` 记录，但该域名与返回的证书不匹配，访问 DSM 使用表中的 `nas.guangluo.top`。
 
 Mac mini 的 Nginx Proxy Manager 容器已停止。`nginx.guangluo.top` 仍指向 Mac mini，但原管理端口 `7001` 和 HTTPS `443` 均未接受连接。恢复当前域名入口时，应保存 DSM 反代规则和相关证书。旧 NPM 的数据和证书目录只用于恢复旧部署。
 
@@ -109,7 +113,7 @@ Emby 只读媒体目录，能够读取和播放文件，但不能通过这份挂
 
 当前 qBittorrent 使用独立地址 `192.168.10.6`，另有内部地址 `172.30.61.2`。应用代理类型设为 `None`，peer、BT、RSS、miscellaneous 代理开关关闭；Ani-RSS 的应用代理也关闭。
 
-只关闭应用代理还不够，因为下层网关仍可能把流量送进代理。为此，Sing-box 在通用分流规则前加入来源地址直连规则。仓库中的实际规则片段为：
+关闭应用代理之后，出网路径还由网关的路由策略决定。UniFi 为下载器单设直连策略。进入 sing-box 的流量则先匹配下面这条来源规则。
 
 ```json
 {
@@ -197,11 +201,11 @@ NAS 相册服务端内存上限为 10240 MiB，Node 堆设置为 4096 MiB；数�
 
 因此完整恢复需要同时考虑文件和数据库，并核对备份时间的一致性。本文没有确认现有备份周期、保留策略和恢复演练结果，这部分仍是需要补齐的运行记录。
 
-## 五、DNS 与网关：迁到 Mac mini，减少对 NAS 的依赖
+## 五、DNS 与网关：Mac mini 运行原生 DNS 和 WireGuard
 
-Mac mini 的 AdGuard Home 在 `:53` 接收查询，转交 SmartDNS `127.0.0.1:6053`。国内域名走阿里 DoH 或腾讯 DoT，默认组通过 Surge SOCKS5 `:6153` 访问境外 DoH。AdGuard 启用 4 MiB 缓存、两个备用 DoH 上游和每日转换的 Johnshall 域名过滤列表。SmartDNS 启用 16,384 条缓存、持久化、预取和过期服务。
+Mac mini 原生运行的 AdGuard Home 在 `:53` 接收查询，转交 OrbStack 中的 SmartDNS `127.0.0.1:6053`。国内域名走阿里 DoH 或腾讯 DoT，默认组通过 Surge SOCKS5 `:6153` 访问境外 DoH。AdGuard 保留 4 MiB 缓存和两个备用 DoH 上游，SmartDNS 负责分组解析和上游缓存。
 
-本轮客户端从 UDM 收到的默认网关为 `192.168.10.1`，DNS 为 `192.168.10.4` 和 `192.168.10.1`。Mac mini 的原生 sing-box 接收 WireGuard，监听 UDP `51820`，隧道地址为 `10.69.69.1/30`，MTU 为 `1408`。Surge 也在局域网提供 HTTP 代理 `:6152`。Tailscale 另行通告家庭主网，用于远程访问。
+本轮客户端从 UDM 收到的默认网关为 `192.168.10.1`，DNS 为 `192.168.10.4` 和 `192.168.10.1`。UDM 只解析部分内网域名，像相册和 Home Assistant 仍依赖 Mac mini 的本地记录。Mac mini 的原生 sing-box 接收 WireGuard，监听 UDP `51820`。Surge 还在局域网提供 HTTP 代理 `:6152`，Tailscale 则通告家庭主网，供远程访问。
 
 DNS 特例、下载与通用流量规则的先后顺序，以及实测范围见 [《家庭网络改造实录》](/2026/10/18/network-rebuild/)。
 
