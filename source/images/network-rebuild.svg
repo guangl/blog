@@ -29,7 +29,7 @@
 
   <rect class="box3" x="500" y="120" width="180" height="64"/>
   <text class="t" x="520" y="150">本地 / 直连路径</text>
-  <text class="s" x="520" y="170">范围以 UDM 配置为准</text>
+  <text class="s" x="520" y="170">本地访问 / WAN1 直连</text>
 
   <rect class="box2" x="500" y="240" width="180" height="64"/>
   <text class="t" x="520" y="270">策略选中 → WG</text>
@@ -44,8 +44,8 @@
   <text class="s" x="760" y="410">SOCKS5 :6153</text>
 
   <rect class="box3" x="250" y="360" width="300" height="64"/>
-  <text class="t" x="270" y="390">DNS：AdGuard → SmartDNS</text>
-  <text class="s" x="270" y="410">Mac mini :53 → :6053 → 分组 DoH / DoT</text>
+  <text class="t" x="270" y="390">DNS：AdGuard Home → SmartDNS</text>
+  <text class="s" x="270" y="410">macOS 原生 :53 → OrbStack :6053</text>
 
   <path class="l" d="M190,152 H245"/>
   <path class="l" d="M420,140 H495"/>
