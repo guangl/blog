@@ -405,12 +405,12 @@ bun run favicon
 
 | 部分 | 位置 | 负责的内容 |
 | --- | --- | --- |
-| 模板 | `templates/sitemap.xml` | 文章、首页、标签、分类，以及 `xmlns:image` 命名空间 |
-| 构建期脚本 | `scripts/sitemap-extras.js` | 每篇文章的 `<image:image>`、`/posts/` 与 `/archives/`、年月归档 |
+| 模板 | `templates/sitemap.xml` | 文章、首页、独立页面，以及 `xmlns:image` 命名空间 |
+| 构建期脚本 | `scripts/sitemap-extras.js` | 每篇文章的 `<image:image>`、`/posts/` |
 
-为什么要分成两半：nunjucks 模板只能拿到 generator 传进去的 `posts` / `tags` / `categories`，而图片清单要从正文里现取、归档页根本不是 post 或 page，模板里都写不出来。脚本挂在 `after_generate` 上改写 `sitemap.xml` 这条路由，先查 `hexo.route.list()` 再决定收不收，所以不会出现「模板里写了、产物里没有」的 404 条目。自检会逐条校验 `<loc>` 与 `<image:loc>` 都能在产物里找到实体，并且**带图的文章必须有图片记录**。
+为什么要分成两半：图片清单要从正文里现取，`/posts/` 也不是 post 或 page，模板无法直接输出。脚本在 `after_generate` 改写 `sitemap.xml`，只补真实存在的路由。自检会校验 `<loc>` 与 `<image:loc>` 都能在产物里找到实体、带图的文章有图片记录，以及页面 URL 未标记 `noindex`。
 
-收录口径：收文章、首页、`/posts/`、`/archives/` 与年月归档、分类页、标签页、独立页面；**不收分页**（`/posts/page/2/`）——同一批文章在分页里重复出现，`page/1` 与 `/posts/` 还是同一份内容，收进来只浪费抓取配额。
+站点地图提交文章、首页、`/posts/` 和可索引的独立页面。归档、分类与标签仍可通过站内导航访问，但 Stellar 将它们标记为 `noindex`，因此不提交。文章列表的分页（如 `/posts/page/2/`）也不提交。
 
 2026-10-17 实测推送：`node tools/ping-search.mjs _config.domain.yml --strict` 向 `api.indexnow.org` 提交站点地图里的 URL（条数随内容变化，别写死），返回 200。`<image:loc>` 不会被当成页面 URL 推给 IndexNow（`tools/ping-search.mjs` 用的是 cheerio 的 `loc` 选择器，`image:loc` 不在其中）。
 
@@ -442,7 +442,7 @@ bun run seo:ping       # 推送 IndexNow
 | `photo-meta.js` | 文章末尾的拍摄参数卡片（手写 + EXIF） |
 | `gallery.js` | 相册页：扫全部文章的照片铺成网格 |
 | `photo-index.js` | 上面两个插件共用的「这篇文章有哪些照片」工具 |
-| `sitemap-extras.js` | 图片 sitemap 与 `/posts/`、归档页补进 `sitemap.xml`（见 [搜索引擎收录](#搜索引擎收录)） |
+| `sitemap-extras.js` | 图片 sitemap 与 `/posts/` 补进 `sitemap.xml`（见 [搜索引擎收录](#搜索引擎收录)） |
 
 `_config.stellar.yml` 的 `inject.head_end` 负责两件事：图标链接（`favicon.ico` 与 `apple-touch-icon.png`）和首页 Hero 的对比度修正（Hero 现在关着，这段是休眠的，见上文）。
 
