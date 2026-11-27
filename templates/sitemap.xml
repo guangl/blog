@@ -7,11 +7,11 @@
   首页统一由末尾那条 priority 1.0 的记录负责。
   改动本文件后 tools/check-site.mjs 会校验 sitemap 里没有重复 URL。
 
-  这里只负责「模板拿得到的数据」：文章、首页、标签、分类。另外两块由
+  这里只输出文章、独立页面和首页。Stellar 将标签、分类和归档标记为 noindex，
+  因此不把它们列入站点地图。另外两块由
   scripts/sitemap-extras.js 在 after_generate 里补：
     - `<image:image>`（图片 sitemap，照片站的图片搜索入口）；
-    - `/posts/` 与 `/archives/`、年月归档（它们不是 post 也不是 page，
-      模板里的 posts 循环扫不到）。
+    - `/posts/`（它不是 post 也不是 page，模板里的 posts 循环扫不到）。
   命名空间写在这里、图片块由脚本插入，两边必须同时在位。
 -#}
 {% set siteUrl = config.url | uriencode %}
@@ -38,21 +38,4 @@
     <priority>1.0</priority>
   </url>
 
-  {% for tag in tags %}
-  <url>
-    <loc>{{ tag.permalink | uriencode }}</loc>
-    <lastmod>{{ sNow | formatDate }}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.2</priority>
-  </url>
-  {% endfor %}
-
-  {% for cat in categories %}
-  <url>
-    <loc>{{ cat.permalink | uriencode }}</loc>
-    <lastmod>{{ sNow | formatDate }}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.2</priority>
-  </url>
-  {% endfor %}
 </urlset>

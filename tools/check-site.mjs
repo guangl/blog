@@ -82,11 +82,17 @@ const homeHeroEnabled = homeData.hero?.enabled === true;
 
 const pages = files(output).filter(path => path.endsWith('.html'));
 const articles = [];
+const noindexPages = new Set();
 for (const file of pages) {
   const path = relative(output, file).split(sep).join('/');
   const url = new URL(path, site);
   const raw = readFileSync(file, 'utf8');
   const $ = load(raw);
+  // none 是 noindex, nofollow 的简写；同时检查 Google 专用的指令。
+  const noindex = $('head meta[name="robots" i], head meta[name="googlebot" i]').toArray().some(meta =>
+    ($(meta).attr('content') || '').toLowerCase().split(/[,\s]+/).some(value =>
+      value === 'noindex' || value === 'none'));
+  if (noindex) noindexPages.add(path);
   // 独立 Archify 查看器和文章一起发布，校验原样复制与源码索引。
   const diagram = /^\d{4}\/\d{2}\/\d{2}\/([^/]+)\/(archify-[\w-]+\/index\.html)$/.exec(path);
   if (diagram) {
@@ -297,15 +303,19 @@ feed('entry').each((_, element) => {
 const sitemapText = readFileSync(resolve(output, 'sitemap.xml'), 'utf8');
 const sitemap = load(sitemapText, { xmlMode: true });
 sitemap('loc').each((_, element) => localTarget(sitemap(element).text(), site, 'sitemap.xml'));
-const sitemapUrls = sitemap('loc').toArray().map(element => sitemap(element).text().trim());
+const sitemapUrls = sitemap('url > loc').toArray().map(element => sitemap(element).text().trim());
 report(sitemapUrls.length > 0, 'sitemap.xml has no URLs');
 report(sitemapUrls.includes(site.href), 'sitemap.xml is missing the homepage');
-// 列表页与归档页由 scripts/sitemap-extras.js 在 after_generate 里补（模板的 posts
-// 循环扫不到它们）。这里是「收录口径」的硬约束：这两类入口必须收。
 report(sitemapText.includes('xmlns:image='),
   'sitemap.xml is missing the image sitemap namespace (templates/sitemap.xml)');
-for (const path of ['posts/', 'archives/']) {
-  report(sitemapUrls.includes(new URL(path, site).href), `sitemap.xml is missing ${path}`);
+report(sitemapUrls.includes(new URL('posts/', site).href), 'sitemap.xml is missing posts/');
+for (const loc of sitemapUrls) {
+  const url = new URL(loc, site);
+  if (url.origin !== site.origin || !url.pathname.startsWith(config.root)) continue;
+  const path = decodeURIComponent(url.pathname.slice(config.root.length));
+  const file = !path || path.endsWith('/') ? `${path}index.html` : path;
+  report(!noindexPages.has(file) && !noindexPages.has(`${file}/index.html`),
+    `sitemap.xml lists a noindex page: ${loc}`);
 }
 // 图片 sitemap（Google 的 image 扩展）：每条都要能在产物里找到实体，
 // 而且带图的文章必须至少有一条图片记录——照片站的图片搜索入口。
